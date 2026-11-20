@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Сфера — онлайн-запись и CRM для бизнеса{% endblock %}
+
+{% block content %}
+<section class="landing-hero">
+  <div class="landing-hero__content">
+    <span class="landing-badge">{% svg_icon "sparkles" 15 %} Платформа онлайн-записи</span>
+    <h1>Ваша страница записи.<br><span>Клиенты и заказы — в одном месте.</span></h1>
+    <p class="landing-lead">
+      Сфера помогает мастерам, салонам и небольшим компаниям принимать записи
+      онлайн, вести клиентов и видеть деньги без таблиц и блокнотов.
+    </p>
+    <div class="landing-actions">
+      <a class="btn btn-primary btn-lg" href="{% url 'register' %}">
+        {% svg_icon "plus" 17 %} Создать страницу бизнеса
+      </a>
+      <a class="btn btn-outline-secondary btn-lg" href="{% url 'login' %}">Войти</a>
+    </div>
+    <ul class="landing-points">
+      <li>{% svg_icon "check" 15 %} Страница записи за пару минут</li>
+      <li>{% svg_icon "check" 15 %} Воронка, клиенты и аналитика</li>
+      <li>{% svg_icon "check" 15 %} Без комиссии за записи</li>
+    </ul>
+  </div>
+
+  <div class="landing-visual" aria-hidden="true">
+    <div class="preview-card">
+      <div class="preview-card__head">
+        <span class="preview-avatar">С</span>
+        <div>
+          <strong>Студия «Сфера»</strong>
+          <span>онлайн-запись</span>
+        </div>
+        <span class="preview-badge">открыто</span>
+      </div>
+      <div class="preview-services">
+        <div><span>Стрижка и укладка</span><strong>2 500 ₽</strong></div>
+        <div><span>Окрашивание</span><strong>5 800 ₽</strong></div>
+        <div><span>Уход для волос</span><strong>1 900 ₽</strong></div>
+      </div>
+      <div class="preview-slot">
+        <span>Ближайшее свободное время</span>
+        <strong>Сегодня, 18:30</strong>
+      </div>
+      <div class="preview-button">Записаться</div>
+      <div class="preview-link">/s/studio-sfera/</div>
+    </div>
+    <div class="preview-float preview-float--new">
+      {% svg_icon "calendar" 15 %}
+      <span>Новая запись</span>
+      <strong>Анна, 14:00</strong>
+    </div>
+    <div class="preview-float preview-float--debt">
+      {% svg_icon "wallet" 15 %}
+      <span>Оплата получена</span>
+      <strong>+3 500 ₽</strong>
+    </div>
+  </div>
+</section>
+
+<section class="showcase" aria-labelledby="showcase-title">
+  <div class="showcase__head">
+    <div>
+      <p class="eyebrow">Витрина площадки</p>
+      <h2 id="showcase-title">Компании на Сфере</h2>
+      <p class="card-hint">Выберите компанию и запишитесь онлайн — без звонков и переписок.</p>
+    </div>
+    <span class="showcase__count">
+      {{ companies_count|ru_plural:"компания,компании,компаний" }}
+    </span>
+  </div>
+
+  {% if companies %}
+    <div class="company-grid">
+      {% for company in companies %}
+        <article class="company-card company-card--{{ company.theme }}">
+          <div class="company-card__head">
+            <span class="company-avatar">{{ company.initials }}</span>
+            <div class="company-card__title">
+              <h3>{{ company.display_name }}</h3>
+              {% if company.address %}
+                <p>{% svg_icon "map-pin" 13 %} {{ company.address }}</p>
+              {% endif %}
+            </div>
+          </div>
+          <p class="company-card__desc">
+            {% if company.description %}
+              {{ company.description|truncatechars:120 }}
+            {% else %}
+              Онлайн-запись открыта — выберите услугу и удобное время.
+            {% endif %}
+          </p>
+          <div class="company-card__meta">
+            <span>{% svg_icon "tools" 14 %} {{ company.service_count|ru_plural:"услуга,услуги,услуг" }}</span>
+            {% if company.work_hours %}
+              <span>{% svg_icon "clock" 14 %} {{ company.work_hours }}</span>
+            {% endif %}
+          </div>
+          <div class="company-card__footer">
+            <a class="btn btn-primary btn-sm" href="{{ company.get_absolute_url }}">
+              Записаться {% svg_icon "arrow-right" 14 %}
+            </a>
+            <a class="company-card__link" href="{{ company.get_absolute_url }}">Страница компании</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card landing-empty">
+      {% svg_icon "users" 26 %}
+      <h2>Пока здесь нет компаний</h2>
+      <p>Станьте первой компанией на Сфере — создайте страницу и принимайте записи.</p>
+      <a class="btn btn-primary btn-sm" href="{% url 'register' %}">Создать страницу бизнеса</a>
+    </div>
+  {% endif %}
+</section>
+
+<section class="landing-steps" aria-labelledby="steps-title">
+  <div class="landing-steps__head">
+    <p class="eyebrow">Как это работает</p>
+    <h2 id="steps-title">От регистрации до первой записи</h2>
+  </div>
+  <div class="landing-steps__grid">
+    <article class="landing-step">
+      <span class="landing-step__num">1</span>
+      <h3>Создайте страницу</h3>
+      <p>Название, контакты и удобная ссылка вида <code>/s/ваш-бизнес/</code>.</p>
+    </article>
+    <article class="landing-step">
+      <span class="landing-step__num">2</span>
+      <h3>Добавьте услуги и цены</h3>
+      <p>Прайс сразу появится на странице — клиенты выберут услугу сами.</p>
+    </article>
+    <article class="landing-step">
+      <span class="landing-step__num">3</span>
+      <h3>Принимайте записи</h3>
+      <p>Заявки попадают в воронку, а оплаты и долги видны на рабочем столе.</p>
+    </article>
+  </div>
+</section>
+{% endblock %}

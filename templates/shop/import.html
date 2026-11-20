@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Импорт прайса — Сфера{% endblock %}
+
+{% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'shop:services' %}">Услуги</a>
+  {% svg_icon "chevron-right" 14 %}
+  <span>Импорт из Excel</span>
+</nav>
+
+<div class="form-page form-page--wide">
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">Excel-обмен</p>
+      <h1>Импорт прайса</h1>
+      <p class="page-sub">Загрузите .xlsx — обновим цены и добавим новые услуги.</p>
+    </div>
+    <div class="page-head__actions">
+      <a class="btn btn-outline-secondary" href="{% url 'shop:service_template' %}">
+        {% svg_icon "download" 15 %} Скачать шаблон
+      </a>
+      <a class="btn btn-outline-secondary" href="{% url 'shop:service_export' %}">
+        {% svg_icon "download" 15 %} Экспорт прайса
+      </a>
+    </div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="card form-card">
+      <div class="card-head">
+        <div>
+          <h2>Загрузить файл</h2>
+          <p class="card-hint">Поддерживается только .xlsx (Excel 2007+).</p>
+        </div>
+      </div>
+
+      <form method="post" enctype="multipart/form-data" class="upload-form">
+        {% csrf_token %}
+        <label class="upload-drop" for="price-file">
+          {% svg_icon "upload" 26 %}
+          <span class="upload-drop__title">Выберите файл прайса</span>
+          <span class="upload-drop__hint">или перетащите .xlsx сюда</span>
+          <input type="file" id="price-file" name="file" accept=".xlsx" required>
+        </label>
+        <div class="form-actions">
+          <a class="btn btn-outline-secondary" href="{% url 'shop:services' %}">Отмена</a>
+          <button class="btn btn-primary" type="submit">Импортировать</button>
+        </div>
+      </form>
+
+      {% if result %}
+        <div class="import-report">
+          <h3>Результат импорта</h3>
+          <div class="import-summary">
+            <span class="import-chip">Всего строк: {{ result.total }}</span>
+            <span class="import-chip import-chip--ok">Создано: {{ result.created }}</span>
+            <span class="import-chip import-chip--info">Обновлено: {{ result.updated }}</span>
+            <span class="import-chip import-chip--warn">Пропущено: {{ result.skipped }}</span>
+          </div>
+
+          {% if result.skipped_rows %}
+            <div class="table-responsive">
+              <table class="table app-table import-report-table mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Строка</th>
+                    <th scope="col">Название</th>
+                    <th scope="col">Причина</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in result.skipped_rows %}
+                    <tr>
+                      <td>{{ row.row }}</td>
+                      <td>{{ row.name }}</td>
+                      <td class="text-muted">{{ row.reason }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% if result.skipped > result.skipped_rows|length %}
+              <p class="empty-note">Показаны первые {{ result.skipped_rows|length }} пропущенных строк.</p>
+            {% endif %}
+          {% else %}
+            <p class="empty-note">Пропущенных строк нет — прайс обновлён полностью.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    <aside class="form-aside">
+      <div class="card info-card">
+        <h2>{% svg_icon "list" 17 %} Колонки файла</h2>
+        <ol class="import-rules">
+          <li><strong>Название</strong> — обязательное, до 160 символов.</li>
+          <li><strong>Цена</strong> — обязательная, число.</li>
+          <li><strong>Себестоимость</strong> — расходники, можно пусто.</li>
+          <li><strong>Длительность, мин</strong> — можно пусто (будет 60).</li>
+          <li><strong>Активна</strong> — да / нет.</li>
+        </ol>
+      </div>
+
+      <div class="card info-card">
+        <h2>{% svg_icon "check-circle" 17 %} Как это работает</h2>
+        <ul class="ticks">
+          <li>Совпадение по названию — услуга обновится.</li>
+          <li>Новое название — услуга создастся.</li>
+          <li>Пустые строки пропускаются.</li>
+          <li>Каждая ошибка видна в отчёте с номером строки.</li>
+        </ul>
+      </div>
+
+      <div class="card info-card info-card--tip">
+        <h2>{% svg_icon "sparkles" 17 %} Совет</h2>
+        <p class="card-hint">Сначала скачайте экспорт своего прайса — так проще менять цены, не меняя структуру.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Настройки — Сфера{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Настройки</p>
+    <h1>Публичная страница и воронка</h1>
+    <p class="page-sub">Так клиенты видят вашу компанию и так движутся заказы.</p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn btn-outline-primary" href="{{ public_url }}" target="_blank" rel="noopener">
+      {% svg_icon "external" 16 %} Открыть страницу
+    </a>
+  </div>
+</div>
+
+<div class="settings-grid">
+  <form method="post" class="card form-card settings-card" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="profile">
+
+    <div class="card-head">
+      <div>
+        <h2>Публичная страница</h2>
+        <p class="card-hint">Это увидят клиенты по адресу <code>/s/{{ profile.slug }}/</code>.</p>
+      </div>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="form-grid">
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.slug.id_for_label }}">Адрес страницы<span class="req">*</span></label>
+        <div class="input-prefix">
+          <span class="input-prefix__text">/s/</span>
+          {{ form.slug }}
+          <span class="input-prefix__suffix">/</span>
+        </div>
+        <div class="form-text">Только латиница, цифры и дефис. Ссылку можно менять.</div>
+        {% for error in form.slug.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+      </div>
+      {% include "partials/form_field.html" with field=form.business_name %}
+    </div>
+
+    {% include "partials/form_field.html" with field=form.description %}
+
+    <div class="form-grid">
+      {% include "partials/form_field.html" with field=form.phone %}
+      {% include "partials/form_field.html" with field=form.telegram %}
+      {% include "partials/form_field.html" with field=form.address %}
+      {% include "partials/form_field.html" with field=form.work_hours %}
+    </div>
+
+    <fieldset class="mb-3">
+      <legend class="form-label">Тема оформления</legend>
+      <div class="theme-options">
+        {% for radio in form.theme %}
+          <label class="theme-option" for="{{ radio.id_for_label }}">
+            {{ radio.tag }}
+            <span class="theme-swatch theme-swatch--{{ radio.data.value }}" aria-hidden="true"></span>
+            <span class="theme-option__label">{{ radio.choice_label }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {% for error in form.theme.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+    </fieldset>
+
+    <label class="form-check form-check-card mb-3" for="{{ form.is_public.id_for_label }}">
+      {{ form.is_public }}
+      <span>
+        <span class="form-check-card__title">Показывать компанию на главной странице Сферы</span>
+        <span class="form-check-card__desc">Компания появится в витрине площадки. Страницу по прямой ссылке это не отключает.</span>
+      </span>
+    </label>
+    {% for error in form.is_public.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+
+    <div class="form-actions">
+      <span class="form-hint">Изменения появятся сразу после сохранения.</span>
+      <button class="btn btn-primary" type="submit">Сохранить настройки</button>
+    </div>
+  </form>
+
+  <aside class="settings-aside">
+    <div class="card info-card">
+      <h2>{% svg_icon "external" 17 %} Ваша ссылка</h2>
+      <a class="public-link" href="{{ public_url }}" target="_blank" rel="noopener">{{ public_url }}</a>
+      <p class="card-hint">Скопируйте её в Instagram, Telegram или на визитку. Клиенту не нужно регистрироваться.</p>
+      <button type="button" class="btn btn-outline-primary btn-sm js-copy" data-copy-text="{{ public_url }}">
+        {% svg_icon "copy" 15 %} Скопировать ссылку
+      </button>
+    </div>
+
+    <div class="card info-card">
+      <h2>{% svg_icon "clock" 17 %} Часы работы</h2>
+      <p class="card-hint">Показываются на странице рядом с адресом. Формат свободный: «09:00 - 20:00» или «Пн–Сб, 10:00–19:00».</p>
+    </div>
+
+    <div class="card info-card">
+      <h2>{% svg_icon "wallet" 17 %} Что видит клиент</h2>
+      <ul class="ticks">
+        <li>Название, описание и контакты</li>
+        <li>Только активные услуги из прайса</li>
+        <li>Форму записи на выбранную услугу</li>
+      </ul>
+    </div>
+  </aside>
+</div>
+
+<section class="card funnel-card" aria-labelledby="funnel-title">
+  <div class="card-head">
+    <div>
+      <h2 id="funnel-title">Этапы воронки</h2>
+      <p class="card-hint">
+        Колонки рабочего стола. Порядок — число: меньшее значение левее.
+        Этап «финальный» означает успешное завершение и включает правило долгов.
+      </p>
+    </div>
+    <div class="funnel-templates">
+      {% for key, tpl in templates.items %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="load_template">
+          <input type="hidden" name="template" value="{{ key }}">
+          <button class="btn btn-outline-primary btn-sm" type="submit" title="{{ tpl.description }}">
+            {% svg_icon "download" 15 %} {{ tpl.title }}
+          </button>
+        </form>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="stage-editors">
+    {% for stage in stages %}
+      <div class="stage-editor">
+        <form method="post" class="stage-editor__form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="stage_update">
+          <input type="hidden" name="stage_id" value="{{ stage.pk }}">
+
+          <span class="stage-dot stage-dot--{{ stage.color }}" aria-hidden="true"></span>
+          <input class="form-control stage-editor__name" type="text" name="name"
+                 value="{{ stage.name }}" maxlength="80" aria-label="Название этапа" required>
+          <select class="form-select stage-editor__color" name="color" aria-label="Цвет этапа">
+            {% for value, label in colors %}
+              <option value="{{ value }}" {% if stage.color == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <input class="form-control stage-editor__order" type="number" name="order"
+                 value="{{ stage.order }}" min="0" aria-label="Порядок">
+          <label class="form-check stage-editor__final">
+            <input class="form-check-input" type="checkbox" name="is_final" {% if stage.is_final %}checked{% endif %}>
+            <span>финал</span>
+          </label>
+          <button class="btn btn-sm btn-outline-primary" type="submit">Сохранить</button>
+        </form>
+        <form method="post" class="stage-editor__delete"
+              onsubmit="return confirm('Удалить этап «{{ stage.name|escapejs }}»?');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="stage_delete">
+          <input type="hidden" name="stage_id" value="{{ stage.pk }}">
+          <button class="btn btn-icon btn-sm btn-icon--danger" type="submit"
+                  aria-label="Удалить этап «{{ stage.name }}»" title="Удалить этап">
+            {% svg_icon "trash" 15 %}
+          </button>
+        </form>
+      </div>
+    {% empty %}
+      <p class="empty-note">Этапов пока нет — загрузите шаблон или добавьте первый.</p>
+    {% endfor %}
+  </div>
+
+  <form method="post" class="stage-add">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="stage_add">
+    <h3>{% svg_icon "plus" 16 %} Новый этап</h3>
+    <div class="stage-add__row">
+      <input class="form-control" type="text" name="new_name" maxlength="80"
+             placeholder="Например, «Согласование»" aria-label="Название нового этапа" required>
+      <select class="form-select" name="new_color" aria-label="Цвет нового этапа">
+        {% for value, label in colors %}
+          <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input class="form-control" type="number" name="new_order" min="0"
+             placeholder="Порядок" aria-label="Порядок нового этапа">
+      <label class="form-check stage-editor__final">
+        <input class="form-check-input" type="checkbox" name="new_is_final">
+        <span>финал</span>
+      </label>
+      <button class="btn btn-primary" type="submit">Добавить</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

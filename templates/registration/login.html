@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static sfera %}
+{% block title %}Вход — Сфера{% endblock %}
+
+{% block content %}
+<div class="auth auth--login">
+  <section class="auth__aside">
+    <span class="eyebrow eyebrow--light">Сфера</span>
+    <h1>Все ваши записи, клиенты и деньги — в одном окне</h1>
+    <p class="auth__lead">
+      Воронка вместо блокнота, история обслуживания вместо переписок,
+      аналитика вместо догадок.
+    </p>
+    <ul class="auth__features">
+      <li>{% svg_icon "dashboard" 18 %} Канбан заказов и расписание на день</li>
+      <li>{% svg_icon "users" 18 %} База клиентов с авто и особенностями</li>
+      <li>{% svg_icon "chart" 18 %} Выручка, долги и топ услуг</li>
+      <li>{% svg_icon "sparkles" 18 %} Умный помощник по вашим правилам</li>
+    </ul>
+    <div class="auth__quote">
+      <p>«Перестал держать заказы в голове — теперь вижу, кому нужно позвонить и кто не доплатил».</p>
+      <span>Владелец небольшой студии</span>
+    </div>
+  </section>
+
+  <section class="auth__card">
+    <div class="card auth-card">
+      <div class="auth-card__head">
+        {% include "partials/logo.html" with size="44" show_text=False %}
+        <div>
+          <h2>Вход в Сферу</h2>
+          <p>Введите логин и пароль</p>
+        </div>
+      </div>
+
+      {% if form.errors %}
+        <div class="alert alert-danger" role="alert">Неверный логин или пароль.</div>
+      {% endif %}
+
+      <form method="post" action="{% url 'login' %}" class="auth-card__form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="mb-3">
+          <label class="form-label" for="id_username">Логин</label>
+          <input class="form-control" id="id_username" name="username" autocomplete="username"
+                 value="{{ form.username.value|default:'' }}" required autofocus>
+        </div>
+        <div class="mb-4">
+          <label class="form-label" for="id_password">Пароль</label>
+          <input class="form-control" id="id_password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="btn btn-primary w-100 btn-lg" type="submit">Войти</button>
+      </form>
+
+      <p class="auth-card__switch">
+        Ещё нет страницы? <a href="{% url 'register' %}">Создать страницу бизнеса</a>
+      </p>
+      <p class="auth-card__demo">
+        Демо-доступ: <code>admin</code> / <code>admin123</code> — после
+        <code>python manage.py seed_demo</code>
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock %}

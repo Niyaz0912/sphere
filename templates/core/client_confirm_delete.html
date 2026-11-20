@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Удалить клиента — Сфера{% endblock %}
+
+{% block content %}
+<div class="form-page form-page--narrow">
+  <div class="card danger-card">
+    <span class="danger-card__icon">{% svg_icon "trash" 22 %}</span>
+    <h1>Удалить клиента?</h1>
+    <p>
+      Карточка <strong>{{ client.name }}</strong> ({{ client.phone }}) будет удалена.
+      {% if client.orders.exists %}
+        У клиента есть история заказов — удаление заблокировано, чтобы не потерять деньги и работы.
+      {% else %}
+        Это действие нельзя отменить.
+      {% endif %}
+    </p>
+    <div class="form-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'core:client_detail' client.pk %}">Оставить</a>
+      {% if not client.orders.exists %}
+        <form method="post">
+          {% csrf_token %}
+          <button class="btn btn-danger" type="submit">Удалить навсегда</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

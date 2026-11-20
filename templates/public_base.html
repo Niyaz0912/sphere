@@ -1,0 +1,45 @@
+{% load static sfera %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ profile.display_name }} — онлайн-запись{% endblock %}</title>
+  <meta name="description" content="{{ profile.description|default:'Онлайн-запись в компанию: услуги, цены и удобное время.'|truncatechars:160 }}">
+  <meta name="theme-color" content="{% if profile.theme == 'dark' %}#0F172A{% elif profile.theme == 'rose' %}#E11D48{% elif profile.theme == 'emerald' %}#059669{% else %}#1e50c8{% endif %}">
+  <link rel="icon" type="image/svg+xml" href="{% static 'icon/sfera.svg' %}">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ asset_version }}">
+</head>
+<body class="public-body theme-{{ profile.theme|default:'blue' }}">
+<div class="public-shell">
+  <header class="public-header">
+    <div class="container public-header__inner">
+      <a class="brand brand--public" href="{% url 'home' %}" aria-label="Сфера — на главную">
+        {% include "partials/logo.html" with size="32" show_text=True %}
+      </a>
+      <div class="public-header__actions">
+        {% block header_action %}{% endblock %}
+        {% if user.is_authenticated %}
+          <a class="btn btn-public-ghost btn-sm" href="{% url 'shop:dashboard' %}">Рабочий стол</a>
+        {% else %}
+          <a class="public-header__login" href="{% url 'login' %}">Вход для бизнеса</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  {% block content %}{% endblock %}
+
+  <footer class="public-footer">
+    <div class="container public-footer__inner">
+      <span>Онлайн-запись работает на платформе <a href="{% url 'home' %}"><strong>Сфера</strong></a></span>
+      <span class="public-footer__note">Создайте свою страницу бизнеса</span>
+    </div>
+  </footer>
+</div>
+
+<script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'js/app.js' %}?v={{ asset_version }}"></script>
+</body>
+</html>

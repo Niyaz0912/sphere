@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Рабочий стол — Сфера{% endblock %}
+
+{% block content %}
+<div class="page-head page-head--dashboard">
+  <div>
+    <p class="eyebrow">Рабочий стол · {{ today|date:"d.m.Y" }}</p>
+    <h1>{{ profile.display_name }}</h1>
+    <p class="page-sub">Записи, оплаты и воронка — в одном месте.</p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn btn-outline-secondary" href="{{ profile.get_absolute_url }}" target="_blank" rel="noopener">
+      {% svg_icon "external" 16 %} Моя страница
+    </a>
+    {% if has_services %}
+      <a class="btn btn-primary" href="{% url 'shop:order_create' %}">
+        {% svg_icon "plus" 16 %} Создать запись
+      </a>
+    {% else %}
+      <a class="btn btn-primary" href="{% url 'shop:services' %}">
+        {% svg_icon "tools" 16 %} Сначала добавьте услуги
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+{% include "partials/public_link_card.html" %}
+
+{% if not has_services %}
+  <div class="onboarding-banner" role="status">
+    <span class="onboarding-banner__icon">{% svg_icon "sparkles" 20 %}</span>
+    <div>
+      <strong>Шаг 1: Создайте хотя бы одну услугу, чтобы клиенты могли записываться на вашу страницу</strong>
+      <p>После этого станут доступны новые записи и онлайн-запись.</p>
+    </div>
+    <a class="btn btn-primary btn-sm" href="{% url 'shop:services' %}">Перейти к услугам</a>
+  </div>
+{% endif %}
+
+<div class="metrics metrics--4">
+  <article class="metric-card">
+    <span class="metric-label">Активные записи</span>
+    <span class="metric-value">{{ stats.active }}</span>
+    <span class="metric-note">новые, в работе и предоплата</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Сегодня</span>
+    <span class="metric-value">{{ stats.today }}</span>
+    <span class="metric-note">{{ stats.today|ru_plural:"визит,визита,визитов" }} по расписанию</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Ожидаем оплату</span>
+    <span class="metric-value {% if stats.debt > 0 %}is-negative{% endif %}">{{ stats.debt|rub }}</span>
+    <span class="metric-note">остатки по всем записям</span>
+  </article>
+  <article class="metric-card metric-card--accent">
+    <span class="metric-label">Оплачено за месяц</span>
+    <span class="metric-value">{{ stats.paid_month|rub }}</span>
+    <span class="metric-note">по датам визитов с 1-го числа</span>
+  </article>
+</div>
+
+{% if suggestions %}
+  <section class="assistant" aria-labelledby="assistant-title">
+    <div class="assistant__head">
+      <span class="assistant__icon">{% svg_icon "sparkles" 19 %}</span>
+      <div>
+        <h2 id="assistant-title">Умный помощник</h2>
+        <p>Правила по вашим записям: долги, зависшие заявки и клиенты, которых пора вернуть.</p>
+      </div>
+      <span class="assistant__count">{{ suggestions|length }}</span>
+    </div>
+
+    <div class="assistant__grid">
+      {% for item in suggestions %}
+        <article class="assist-card assist-card--{{ item.kind }}">
+          <header class="assist-card__head">
+            <span class="assist-card__icon">{% svg_icon item.icon 17 %}</span>
+            <h3>{{ item.title }}</h3>
+          </header>
+          <p class="assist-card__text">{{ item.text }}</p>
+
+          {% if item.kind == "sleeping" %}
+            <div class="assist-people">
+              {% for person in item.items %}
+                <div class="assist-person">
+                  <span class="assist-person__info">
+                    <span class="assist-person__name">{{ person.name }}</span>
+                    <span class="assist-person__meta">{{ person.phone }} · {{ person.days }} дн.</span>
+                  </span>
+                  <button type="button" class="btn btn-sm btn-outline-primary js-copy"
+                          data-copy-text="{{ person.reminder }}">
+                    {% svg_icon "copy" 14 %} Текст
+                  </button>
+                </div>
+              {% endfor %}
+            </div>
+            <a class="assist-card__link" href="{{ item.url }}">Открыть базу клиентов {% svg_icon "arrow-right" 14 %}</a>
+          {% else %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ item.url }}">{{ item.action_label }}</a>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% else %}
+  <section class="assistant assistant--calm">
+    <div class="assistant__head">
+      <span class="assistant__icon">{% svg_icon "sparkles" 19 %}</span>
+      <div>
+        <h2>Умный помощник</h2>
+        <p>Проверил записи: долгов нет, заявки не зависли, клиенты на связи.</p>
+      </div>
+      <span class="assistant__count assistant__count--ok">{% svg_icon "check" 14 %}</span>
+    </div>
+  </section>
+{% endif %}
+
+<div class="board-toolbar">
+  <div class="view-switch" role="tablist" aria-label="Режим отображения">
+    <a class="view-switch__btn {% if view_mode == 'kanban' %}is-active{% endif %}"
+       href="?view=kanban&amp;filter={{ filter_key }}" role="tab"
+       aria-selected="{% if view_mode == 'kanban' %}true{% else %}false{% endif %}"
+       data-view-switch="kanban">
+      {% svg_icon "dashboard" 15 %} Воронка
+    </a>
+    <a class="view-switch__btn {% if view_mode == 'list' %}is-active{% endif %}"
+       href="?view=list&amp;filter={{ filter_key }}" role="tab"
+       aria-selected="{% if view_mode == 'list' %}true{% else %}false{% endif %}"
+       data-view-switch="list">
+      {% svg_icon "list" 15 %} Список / Расписание
+    </a>
+  </div>
+
+  <div class="list-filters" id="list-filters" {% if view_mode != 'list' %}hidden{% endif %}>
+    {% for value, label in list_filters %}
+      <a class="filter-chip {% if filter_key == value %}is-active{% endif %}"
+         href="?view=list&amp;filter={{ value }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<section class="kanban" id="kanban-view" {% if view_mode != 'kanban' %}hidden{% endif %}
+         aria-label="Воронка заказов">
+  {% for column in columns %}
+    <div class="kanban-col">
+      <header class="kanban-col__head">
+        <span class="stage-dot stage-dot--{{ column.stage.color }}" aria-hidden="true"></span>
+        <h2 class="kanban-col__name">{{ column.stage.name }}</h2>
+        {% if column.stage.is_final %}
+          <span class="stage-final" title="Финальный этап — успешное завершение">{% svg_icon "check" 12 %}</span>
+        {% endif %}
+        <span class="kanban-col__count">{{ column.count }}</span>
+        <span class="kanban-col__sum">{{ column.total|rub }}</span>
+      </header>
+
+      <div class="kanban-col__body">
+        {% for order in column.orders %}
+          <article class="order-card {% if order.scheduled_at|date:'Y-m-d' == today|date:'Y-m-d' %}order-card--today{% endif %} {% if order.is_overdue and order.debt_amount > 0 %}order-card--overdue{% endif %}"
+                   data-order-card="{{ order.pk }}">
+            <header class="order-card__head">
+              <a class="order-card__client" href="{% url 'core:client_detail' order.client_id %}">{{ order.client.name }}</a>
+              {% if order.debt_amount > 0 %}
+                <span class="money-chip money-chip--debt" title="Остаток к оплате">{{ order.debt_amount|rub }}</span>
+              {% elif order.paid_amount > 0 %}
+                <span class="money-chip money-chip--paid" title="Оплачено полностью">оплачено</span>
+              {% endif %}
+            </header>
+
+            {% if order.client.identifier %}
+              <p class="order-card__object">{% svg_icon "car" 14 %} {{ order.client.identifier }}</p>
+            {% endif %}
+            <p class="order-card__service">{{ order.service_name|default:"Без услуги" }}</p>
+            <p class="order-card__date">{% svg_icon "calendar" 14 %} {{ order.scheduled_at|date:"d.m.Y · H:i" }}</p>
+
+            <dl class="order-card__money">
+              <div><dt>Итого</dt><dd>{{ order.total_amount|rub }}</dd></div>
+              <div><dt>Оплачено</dt><dd>{{ order.paid_amount|rub }}</dd></div>
+              <div><dt>Долг</dt><dd class="{% if order.debt_amount > 0 %}is-debt{% endif %}">{{ order.debt_amount|rub }}</dd></div>
+            </dl>
+
+            <footer class="order-card__actions">
+              {% if order.next_stage_obj %}
+                <form method="post" action="{% url 'shop:order_advance' order.pk %}" class="js-advance">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <button class="btn btn-sm btn-stage" type="submit"
+                          title="Перевести на этап «{{ order.next_stage_obj.name }}»">
+                    {% svg_icon "arrow-right" 14 %} {{ order.next_stage_obj.name }}
+                  </button>
+                </form>
+              {% endif %}
+
+              {% if order.debt_amount > 0 %}
+                <button type="button" class="btn btn-sm btn-sell"
+                        data-bs-toggle="modal" data-bs-target="#payModal"
+                        data-pay-url="{% url 'shop:order_pay' order.pk %}"
+                        data-order-label="{{ order.client.name }} · {{ order.scheduled_at|date:'d.m.Y H:i' }}"
+                        data-debt="{{ order.debt_amount }}"
+                        data-payment="{{ order.payment_method }}">
+                  {% svg_icon "wallet" 14 %} Оплата
+                </button>
+              {% endif %}
+
+              <button type="button" class="btn btn-icon btn-sm" title="Изменить запись"
+                      aria-label="Изменить запись {{ order.client.name }}"
+                      data-bs-toggle="modal" data-bs-target="#orderModal"
+                      data-edit-url="{% url 'shop:order_edit' order.pk %}"
+                      data-order-id="{{ order.pk }}"
+                      data-client-name="{{ order.client.name }}"
+                      data-client-id="{{ order.client_id }}"
+                      data-service-id="{{ order.service_id|default:'' }}"
+                      data-stage-id="{{ order.stage_id }}"
+                      data-scheduled="{{ order.scheduled_at|date:'Y-m-d\TH:i' }}"
+                      data-total="{{ order.total_amount }}"
+                      data-paid="{{ order.paid_amount }}"
+                      data-payment="{{ order.payment_method }}"
+                      data-details="{{ order.work_details }}">
+                {% svg_icon "edit" 15 %}
+              </button>
+            </footer>
+          </article>
+        {% empty %}
+          <div class="kanban-empty">
+            <p>Пока пусто</p>
+            {% if has_services %}
+              <a href="{% url 'shop:order_create' %}">+ Добавить запись</a>
+            {% else %}
+              <a href="{% url 'shop:services' %}">+ Добавить услугу</a>
+            {% endif %}
+          </div>
+        {% endfor %}
+
+        {% if column.hidden %}
+          <p class="kanban-more">Ещё {{ column.hidden }} — откройте список</p>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</section>
+
+<section class="card table-card" id="list-view" {% if view_mode != 'list' %}hidden{% endif %}
+         aria-label="Список записей">
+  <div class="table-responsive">
+    <table class="table app-table orders-table mb-0">
+      <thead>
+        <tr>
+          <th scope="col">Дата</th>
+          <th scope="col">Клиент</th>
+          <th scope="col">Объект</th>
+          <th scope="col">Услуга</th>
+          <th scope="col">Этап</th>
+          <th scope="col" class="text-end">Сумма</th>
+          <th scope="col" class="text-end">Оплачено</th>
+          <th scope="col" class="text-end">Долг</th>
+          <th scope="col" class="text-end">Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+          <tr>
+            <td data-label="Дата">
+              <span class="date-main">{{ order.scheduled_at|date:"d.m.Y" }}</span>
+              <span class="date-sub">{{ order.scheduled_at|date:"H:i" }}</span>
+            </td>
+            <td data-label="Клиент">
+              <a class="table-client" href="{% url 'core:client_detail' order.client_id %}">{{ order.client.name }}</a>
+            </td>
+            <td data-label="Объект">
+              {% if order.client.identifier %}
+                <span class="object-chip">{% svg_icon "car" 13 %} {{ order.client.identifier }}</span>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td data-label="Услуга">{{ order.service_name|default:"Без услуги" }}</td>
+            <td data-label="Этап">
+              <span class="badge text-bg-{{ order.stage.color }}">{{ order.stage.name }}</span>
+            </td>
+            <td data-label="Сумма" class="text-end tabular">{{ order.total_amount|rub }}</td>
+            <td data-label="Оплачено" class="text-end tabular">{{ order.paid_amount|rub }}</td>
+            <td data-label="Долг" class="text-end tabular {% if order.debt_amount > 0 %}is-debt{% endif %}">
+              {{ order.debt_amount|rub }}
+            </td>
+            <td data-label="Действия" class="text-end">
+              <div class="row-actions">
+                {% if order.debt_amount > 0 %}
+                  <button type="button" class="btn btn-sm btn-sell"
+                          data-bs-toggle="modal" data-bs-target="#payModal"
+                          data-pay-url="{% url 'shop:order_pay' order.pk %}"
+                          data-order-label="{{ order.client.name }} · {{ order.scheduled_at|date:'d.m.Y H:i' }}"
+                          data-debt="{{ order.debt_amount }}"
+                          data-payment="{{ order.payment_method }}">
+                    Принять оплату
+                  </button>
+                {% endif %}
+                <button type="button" class="btn btn-icon btn-sm" title="Изменить"
+                        aria-label="Изменить запись {{ order.client.name }}"
+                        data-bs-toggle="modal" data-bs-target="#orderModal"
+                        data-edit-url="{% url 'shop:order_edit' order.pk %}"
+                        data-order-id="{{ order.pk }}"
+                        data-client-name="{{ order.client.name }}"
+                        data-client-id="{{ order.client_id }}"
+                        data-service-id="{{ order.service_id|default:'' }}"
+                        data-stage-id="{{ order.stage_id }}"
+                        data-scheduled="{{ order.scheduled_at|date:'Y-m-d\TH:i' }}"
+                        data-total="{{ order.total_amount }}"
+                        data-paid="{{ order.paid_amount }}"
+                        data-payment="{{ order.payment_method }}"
+                        data-details="{{ order.work_details }}">
+                  {% svg_icon "edit" 15 %}
+                </button>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr class="empty-row">
+            <td colspan="9">
+              <div class="empty-state">
+                {% svg_icon "calendar" 26 %}
+                <h2>Записей нет</h2>
+                <p>
+                  {% if filter_key == "today" %}На сегодня записей нет — можно отдохнуть.
+                  {% elif filter_key == "tomorrow" %}На завтра пока свободно.
+                  {% elif filter_key == "done" %}Завершённых записей ещё нет.
+                  {% else %}Добавьте первую запись или дождитесь заявки с публичной страницы.{% endif %}
+                </p>
+                {% if has_services %}
+                  <a class="btn btn-primary btn-sm" href="{% url 'shop:order_create' %}">Создать запись</a>
+                {% else %}
+                  <a class="btn btn-primary btn-sm" href="{% url 'shop:services' %}">Добавить услугу</a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ------------------------------ Модалка записи ------------------------------ #}
+<div class="modal fade" id="orderModal" tabindex="-1" aria-labelledby="orderModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <form id="order-edit-form" method="post" data-ajax-form="order-edit" novalidate>
+        {% csrf_token %}
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title h5" id="orderModalLabel">Запись</h2>
+            <p class="modal-subtitle" id="order-modal-lead">Измените данные и сохраните.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="{{ order_form.client.id_for_label }}">Клиент</label>
+              {{ order_form.client }}
+              <span class="invalid-feedback d-block" data-field-error="client"></span>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ order_form.service.id_for_label }}">Услуга из прайса</label>
+              {{ order_form.service }}
+              <span class="invalid-feedback d-block" data-field-error="service"></span>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ order_form.stage.id_for_label }}">Этап</label>
+              {{ order_form.stage }}
+              <span class="invalid-feedback d-block" data-field-error="stage"></span>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ order_form.scheduled_at.id_for_label }}">Дата и время</label>
+              {{ order_form.scheduled_at }}
+              <span class="invalid-feedback d-block" data-field-error="scheduled_at"></span>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="{{ order_form.total_amount.id_for_label }}">Сумма, ₽</label>
+              {{ order_form.total_amount }}
+              <span class="invalid-feedback d-block" data-field-error="total_amount"></span>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="{{ order_form.paid_amount.id_for_label }}">Оплачено, ₽</label>
+              {{ order_form.paid_amount }}
+              <span class="invalid-feedback d-block" data-field-error="paid_amount"></span>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="{{ order_form.payment_method.id_for_label }}">Способ оплаты</label>
+              {{ order_form.payment_method }}
+              <span class="invalid-feedback d-block" data-field-error="payment_method"></span>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="{{ order_form.work_details.id_for_label }}">Работы и материалы</label>
+              {{ order_form.work_details }}
+              <span class="invalid-feedback d-block" data-field-error="work_details"></span>
+            </div>
+          </div>
+
+          <div class="debt-preview">
+            <span>Долг по записи:</span>
+            <strong id="order-edit-debt">0 ₽</strong>
+          </div>
+          <div class="form-error" data-form-error aria-live="polite"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ------------------------------ Модалка оплаты ------------------------------ #}
+<div class="modal fade" id="payModal" tabindex="-1" aria-labelledby="payModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="pay-form" method="post" data-ajax-form="order-pay" novalidate>
+        {% csrf_token %}
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title h5" id="payModalLabel">Принять оплату</h2>
+            <p class="modal-subtitle" id="pay-order-label"></p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <div class="pay-debt">
+            <span>Остаток долга</span>
+            <strong id="pay-debt-value">0 ₽</strong>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="{{ payment_form.amount.id_for_label }}">Сумма к оплате, ₽</label>
+            {{ payment_form.amount }}
+            <span class="invalid-feedback d-block" data-field-error="amount"></span>
+          </div>
+
+          <fieldset>
+            <legend class="form-label">Способ оплаты</legend>
+            <div class="payment-options">
+              {% for radio in payment_form.payment_method %}
+                <label class="payment-option" for="{{ radio.id_for_label }}">
+                  {{ radio.tag }}
+                  <span>{{ radio.choice_label }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+
+          <div class="form-error" data-form-error aria-live="polite"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Принять оплату</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

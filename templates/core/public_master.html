@@ -1,0 +1,142 @@
+{% extends "public_base.html" %}
+{% load sfera %}
+{% block title %}{{ profile.display_name }} — услуги и онлайн-запись{% endblock %}
+
+{% block header_action %}
+  {% if services %}
+    <a class="btn btn-public-primary btn-sm" href="#booking" data-book-general>Записаться</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="public-hero">
+  <div class="public-hero__glow" aria-hidden="true"></div>
+  <div class="container public-hero__inner">
+    <div class="public-avatar" aria-hidden="true">{{ profile.initials }}</div>
+
+    <div class="public-hero__body">
+      <p class="public-kicker">
+        {% svg_icon "check-circle" 15 %} Компания принимает онлайн-записи
+      </p>
+      <h1>{{ profile.display_name }}</h1>
+      {% if profile.description %}
+        <div class="public-desc">{{ profile.description|linebreaks }}</div>
+      {% else %}
+        <p class="public-desc">Выберите услугу и удобное время — компания подтвердит запись и стоимость.</p>
+      {% endif %}
+
+      <div class="public-meta">
+        {% if profile.work_hours %}
+          <span class="public-meta__item">{% svg_icon "clock" 16 %} {{ profile.work_hours }}</span>
+        {% endif %}
+        {% if profile.address %}
+          <span class="public-meta__item">{% svg_icon "map-pin" 16 %} {{ profile.address }}</span>
+        {% endif %}
+        {% if profile.phone %}
+          <a class="public-meta__item" href="{{ profile.phone_href }}">{% svg_icon "phone" 16 %} {{ profile.phone }}</a>
+        {% endif %}
+        {% if profile.telegram_url %}
+          <a class="public-meta__item" href="{{ profile.telegram_url }}" target="_blank" rel="noopener">{% svg_icon "telegram" 16 %} {{ profile.telegram_handle }}</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<main class="container public-main">
+  {% if booked %}
+    <div class="public-success" role="status">
+      <span class="public-success__icon">{% svg_icon "check" 22 %}</span>
+      <div>
+        <strong>Заявка отправлена!</strong>
+        <p>Компания свяжется с вами, чтобы подтвердить дату и время. Если планы изменятся — просто позвоните.</p>
+      </div>
+      <a class="btn btn-public-ghost btn-sm" href="{{ profile.get_absolute_url }}">Записаться ещё</a>
+    </div>
+  {% endif %}
+
+  <div class="public-grid">
+    <section class="public-card" aria-labelledby="price-title">
+      <div class="public-card__head">
+        <h2 id="price-title">Услуги и цены</h2>
+        <span class="public-card__badge">{{ services|length|ru_plural:"услуга,услуги,услуг" }} в прайсе</span>
+      </div>
+
+      <div class="price-list">
+        {% for service in services %}
+          <div class="price-row">
+            <div class="price-row__main">
+              <span class="price-row__name">{{ service.name }}</span>
+              <span class="price-row__meta">
+                {% svg_icon "clock" 14 %} {{ service.duration_label }}
+              </span>
+            </div>
+            <div class="price-row__side">
+              <span class="price-row__price">{{ service.price|rub }}</span>
+              <a class="btn btn-public-ghost btn-sm price-row__btn"
+                 href="?service={{ service.pk }}#booking"
+                 data-book-service="{{ service.pk }}">Записаться</a>
+            </div>
+          </div>
+        {% empty %}
+          <div class="public-empty">
+            {% svg_icon "tools" 22 %}
+            <p>Прайс пока не заполнен. Позвоните компании — здесь подскажут стоимость и время.</p>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="public-steps">
+        <h3>Как проходит запись</h3>
+        <ol>
+          <li><span>1</span> Выбираете услугу и удобное время.</li>
+          <li><span>2</span> Компания подтверждает запись по телефону.</li>
+          <li><span>3</span> Приходите в назначенное время — все детали уже записаны.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="public-card public-card--booking" id="booking" aria-labelledby="booking-title">
+      <div class="public-card__head">
+        <h2 id="booking-title">Записаться</h2>
+        <span class="public-card__badge">без предоплаты</span>
+      </div>
+      <p class="public-booking__hint">
+        Оставьте заявку — компания перезвонит и подтвердит время.
+      </p>
+
+      {% if services %}
+        <form method="post" action="{{ profile.get_absolute_url }}#booking"
+              class="public-form" id="booking-form" novalidate>
+          {% csrf_token %}
+          <div class="hp-field" aria-hidden="true">{{ form.website }}</div>
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+              {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+
+          {% include "partials/form_field.html" with field=form.service %}
+          {% include "partials/form_field.html" with field=form.name %}
+          {% include "partials/form_field.html" with field=form.phone %}
+          {% include "partials/form_field.html" with field=form.scheduled_at %}
+
+          <button class="btn btn-public-primary w-100 btn-lg" type="submit">
+            {% svg_icon "calendar" 18 %} Записаться
+          </button>
+          <p class="public-form__note">Нажимая кнопку, вы соглашаетесь на обработку контактов для записи.</p>
+        </form>
+      {% else %}
+        <div class="public-empty public-empty--booking">
+          {% svg_icon "phone" 24 %}
+          <p>Онлайн-запись временно недоступна. Позвоните компании напрямую:</p>
+          {% if profile.phone %}
+            <a class="btn btn-public-primary" href="{{ profile.phone_href }}">{{ profile.phone }}</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </section>
+  </div>
+</main>
+{% endblock %}

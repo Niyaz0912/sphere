@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}{{ client.name }} — клиент Сфера{% endblock %}
+
+{% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'core:client_list' %}">Клиенты</a>
+  {% svg_icon "chevron-right" 14 %}
+  <span>{{ client.name }}</span>
+</nav>
+
+<div class="client-hero card">
+  <div class="client-hero__main">
+    <span class="avatar avatar--lg">{{ client.initials }}</span>
+    <div>
+      <p class="eyebrow">Карточка клиента</p>
+      <h1>{{ client.name }}</h1>
+      <div class="client-hero__meta">
+        <a href="tel:{{ client.phone }}" class="link-quiet">{% svg_icon "phone" 15 %} {{ client.phone }}</a>
+        {% if client.identifier %}
+          <span class="object-chip">{% svg_icon "car" 14 %} {{ client.identifier }}</span>
+        {% endif %}
+        <span class="text-muted small">В базе с {{ client.created_at|date:"d.m.Y" }}</span>
+      </div>
+    </div>
+  </div>
+  <div class="client-hero__actions">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'core:client_edit' client.pk %}">
+      {% svg_icon "edit" 15 %} Изменить
+    </a>
+    <a class="btn btn-outline-danger btn-sm" href="{% url 'core:client_delete' client.pk %}">
+      {% svg_icon "trash" 15 %} Удалить
+    </a>
+    <a class="btn btn-primary btn-sm" href="{% url 'shop:order_create' %}?client={{ client.pk }}">
+      {% svg_icon "plus" 15 %} Новая запись
+    </a>
+  </div>
+</div>
+
+<div class="metrics metrics--4">
+  <article class="metric-card">
+    <span class="metric-label">Всего записей</span>
+    <span class="metric-value">{{ orders|length }}</span>
+    <span class="metric-note">завершено: {{ completed_count }}</span>
+  </article>
+  <article class="metric-card metric-card--accent">
+    <span class="metric-label">Принёс за всё время</span>
+    <span class="metric-value">{{ total_paid|rub }}</span>
+    <span class="metric-note">по фактическим оплатам</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Осталось доплатить</span>
+    <span class="metric-value {% if debt > 0 %}is-negative{% endif %}">{{ debt|rub }}</span>
+    <span class="metric-note">из {{ total_billed|rub }} по заказам</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Последний визит</span>
+    <span class="metric-value metric-value--sm">
+      {% if last_visit %}{{ last_visit|date:"d.m.Y" }}{% else %}—{% endif %}
+    </span>
+    <span class="metric-note">
+      {% if last_visit %}{{ last_visit|date:"H:i" }}{% else %}визитов ещё не было{% endif %}
+    </span>
+  </article>
+</div>
+
+{% if client.notes %}
+  <section class="note-card">
+    <h2>{% svg_icon "edit" 16 %} Постоянные заметки</h2>
+    <p>{{ client.notes|linebreaksbr }}</p>
+  </section>
+{% endif %}
+
+<section class="card table-card history-card" aria-labelledby="history-title">
+  <div class="card-head">
+    <div>
+      <h2 id="history-title">История обслуживания</h2>
+      <p class="card-hint">Все заказы клиента с работами, материалами и оплатами. Сначала новые.</p>
+    </div>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'shop:order_create' %}?client={{ client.pk }}">
+      {% svg_icon "plus" 15 %} Повторить запись
+    </a>
+  </div>
+
+  {% if orders %}
+    <div class="table-responsive">
+      <table class="table app-table history-table mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Дата</th>
+            <th scope="col">Услуга и работы</th>
+            <th scope="col">Этап</th>
+            <th scope="col" class="text-end">Сумма</th>
+            <th scope="col" class="text-end">Оплачено</th>
+            <th scope="col" class="text-end">Долг</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+            <tr>
+              <td data-label="Дата">
+                <span class="date-main">{{ order.scheduled_at|date:"d.m.Y" }}</span>
+                <span class="date-sub">{{ order.scheduled_at|date:"H:i" }}</span>
+              </td>
+              <td data-label="Услуга">
+                <span class="history-service">{{ order.service_name|default:"Без услуги" }}</span>
+                {% if order.work_details %}
+                  <span class="history-details">{{ order.work_details|linebreaksbr }}</span>
+                {% endif %}
+              </td>
+              <td data-label="Этап">
+                <span class="badge text-bg-{{ order.stage.color }}">{{ order.stage.name }}</span>
+              </td>
+              <td data-label="Сумма" class="text-end tabular">{{ order.total_amount|rub }}</td>
+              <td data-label="Оплачено" class="text-end tabular">{{ order.paid_amount|rub }}</td>
+              <td data-label="Долг" class="text-end tabular {% if order.debt_amount > 0 %}is-debt{% endif %}">
+                {{ order.debt_amount|rub }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      {% svg_icon "calendar" 26 %}
+      <h2>Истории пока нет</h2>
+      <p>Создайте первую запись — все работы и оплаты появятся здесь.</p>
+      <a class="btn btn-primary btn-sm" href="{% url 'shop:order_create' %}?client={{ client.pk }}">Создать запись</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

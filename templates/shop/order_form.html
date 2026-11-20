@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Новая запись — Сфера{% endblock %}
+
+{% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'shop:dashboard' %}">Рабочий стол</a>
+  {% svg_icon "chevron-right" 14 %}
+  <span>Новая запись</span>
+</nav>
+
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Запись / сделка / визит</p>
+    <h1>Новая запись</h1>
+    <p class="page-sub">Зафиксируйте клиента, услугу и дату — дальше заказ поведёт воронка.</p>
+  </div>
+</div>
+
+{% if not clients %}
+  <div class="alert alert-warning d-flex align-items-center justify-content-between gap-3 flex-wrap">
+    <span>Сначала добавьте клиента — без него запись создать нельзя.</span>
+    <a class="btn btn-sm btn-primary" href="{% url 'core:client_add' %}">Добавить клиента</a>
+  </div>
+{% endif %}
+
+<div class="form-page">
+  <form method="post" class="card form-card" novalidate data-order-form
+        data-service-select="#id_service" data-total-field="#id_total_amount">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="card-head">
+      <div>
+        <h2>Данные записи</h2>
+        <p class="card-hint">Поля со звёздочкой обязательны. Сумму можно поправить вручную.</p>
+      </div>
+      {% if stages %}
+        <span class="badge text-bg-light border">Первый этап: {{ stages.0.name }}</span>
+      {% endif %}
+    </div>
+
+    <div class="form-grid">
+      <div class="mb-3">
+        <label class="form-label" for="id_client">Клиент<span class="req">*</span></label>
+        <select class="form-select" id="id_client" name="client" required>
+          <option value="">Выберите клиента</option>
+          {% for client in clients %}
+            <option value="{{ client.pk }}"
+              {% if form.client.value|stringformat:"s" == client.pk|stringformat:"s" %}selected{% endif %}>
+              {{ client.name }} · {{ client.phone }}{% if client.identifier %} · {{ client.identifier }}{% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        {% for error in form.client.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        <div class="form-text">
+          Нет в списке? <a href="{% url 'core:client_add' %}" target="_blank" rel="noopener">Добавить клиента</a>.
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="id_service">Услуга из прайса</label>
+        <select class="form-select" id="id_service" name="service">
+          <option value="">Без услуги</option>
+          {% for service in form.fields.service.queryset %}
+            <option value="{{ service.pk }}" data-price="{{ service.price }}"
+              {% if form.service.value|stringformat:"s" == service.pk|stringformat:"s" %}selected{% endif %}>
+              {{ service.name }} — {{ service.price|rub }}
+            </option>
+          {% endfor %}
+        </select>
+        {% for error in form.service.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="mb-3">
+        <label class="form-label" for="id_stage">Этап<span class="req">*</span></label>
+        <select class="form-select" id="id_stage" name="stage" required>
+          {% for stage in stages %}
+            <option value="{{ stage.pk }}"
+              {% if form.stage.value|stringformat:"s" == stage.pk|stringformat:"s" %}selected{% endif %}>
+              {{ stage.name }}{% if stage.is_final %} · финал{% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        {% for error in form.stage.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+      </div>
+
+      {% include "partials/form_field.html" with field=form.scheduled_at %}
+    </div>
+
+    <div class="form-grid form-grid--3">
+      {% include "partials/form_field.html" with field=form.total_amount %}
+      {% include "partials/form_field.html" with field=form.paid_amount %}
+      {% include "partials/form_field.html" with field=form.payment_method %}
+    </div>
+
+    {% include "partials/form_field.html" with field=form.work_details %}
+
+    <div class="form-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'shop:dashboard' %}">Отмена</a>
+      <button class="btn btn-primary" type="submit" {% if not clients %}disabled{% endif %}>
+        Создать запись
+      </button>
+    </div>
+  </form>
+
+  <aside class="form-aside">
+    <div class="card info-card">
+      <h2>{% svg_icon "dashboard" 17 %} Что дальше</h2>
+      <ul class="ticks">
+        <li>Запись появится в выбранной колонке воронки.</li>
+        <li>Кнопка «Оплата» примет предоплату или полный расчёт.</li>
+        <li>Работы и материалы сохранятся в истории клиента.</li>
+      </ul>
+    </div>
+    {% if not form.fields.service.queryset %}
+      <div class="card info-card">
+        <h2>{% svg_icon "tools" 17 %} Прайс пуст</h2>
+        <p class="card-hint">Добавьте услуги — тогда их можно будет выбирать и показывать клиентам.</p>
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'shop:services' %}">Перейти к услугам</a>
+      </div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

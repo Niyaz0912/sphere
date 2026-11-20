@@ -1,0 +1,111 @@
+{% load static sfera %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Сфера — онлайн-запись и CRM для бизнеса{% endblock %}</title>
+  <meta name="description" content="Сфера — платформа онлайн-записи и CRM для мастеров, салонов и небольших компаний.">
+  <meta name="theme-color" content="#1e50c8">
+  <link rel="icon" type="image/svg+xml" href="{% static 'icon/sfera.svg' %}">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ asset_version }}">
+</head>
+<body class="app-body">
+<a class="skip-link" href="#main">К содержимому</a>
+
+<header class="app-header">
+  <div class="container app-header__inner">
+    <a class="brand" href="{% url 'home' %}">
+      {% include "partials/logo.html" with size="36" show_text=True %}
+    </a>
+
+    {% if user.is_authenticated %}
+      <button class="app-burger" type="button" data-bs-toggle="collapse" data-bs-target="#appNav"
+              aria-controls="appNav" aria-expanded="false" aria-label="Открыть меню">
+        <span></span><span></span><span></span>
+      </button>
+
+      {% with app=request.resolver_match.app_name name=request.resolver_match.url_name %}
+      <nav class="collapse app-nav" id="appNav" aria-label="Основная навигация">
+        <a class="app-nav__link {% if name == 'dashboard' %}is-active{% endif %}" href="{% url 'shop:dashboard' %}">
+          {% svg_icon "dashboard" 17 %}<span>Рабочий стол</span>
+        </a>
+        <a class="app-nav__link {% if app == 'core' and name != 'settings' %}is-active{% endif %}" href="{% url 'core:client_list' %}">
+          {% svg_icon "users" 17 %}<span>Клиенты</span>
+        </a>
+        <a class="app-nav__link {% if name == 'services' or name == 'service_import' %}is-active{% endif %}" href="{% url 'shop:services' %}">
+          {% svg_icon "tools" 17 %}<span>Услуги</span>
+        </a>
+        <a class="app-nav__link {% if name == 'analytics' %}is-active{% endif %}" href="{% url 'shop:analytics' %}">
+          {% svg_icon "chart" 17 %}<span>Аналитика</span>
+        </a>
+        <a class="app-nav__link {% if name == 'settings' %}is-active{% endif %}" href="{% url 'settings' %}">
+          {% svg_icon "settings" 17 %}<span>Настройки</span>
+        </a>
+      </nav>
+
+      <div class="app-user">
+        {% if profile %}
+          <a class="btn btn-ghost btn-sm app-user__public" href="{{ profile.get_absolute_url }}" target="_blank" rel="noopener">
+            {% svg_icon "external" 15 %}<span>Моя страница</span>
+          </a>
+        {% endif %}
+        <span class="user-chip" title="{{ user.get_username }}">
+          <span class="user-chip__avatar">{{ profile.business_name|default:user.get_username|initials }}</span>
+          <span class="user-chip__name">{{ profile.business_name|default:user.get_username }}</span>
+        </span>
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button class="btn btn-outline-secondary btn-sm" type="submit">Выйти</button>
+        </form>
+      </div>
+      {% endwith %}
+    {% else %}
+      <div class="app-user app-user--guest">
+        <a class="btn btn-ghost btn-sm" href="{% url 'login' %}">Войти</a>
+        <a class="btn btn-primary btn-sm" href="{% url 'register' %}">Создать страницу</a>
+      </div>
+    {% endif %}
+  </div>
+</header>
+
+<main id="main" class="container app-main">
+  <noscript>
+    <div class="alert alert-warning" role="alert">
+      Для модальных окон, быстрого поиска и копирования текста нужен JavaScript.
+      Включите его и обновите страницу — основные страницы работают и без него.
+    </div>
+  </noscript>
+  {% if messages %}
+    <div class="messages mb-3">
+      {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="status">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="app-footer">
+  <div class="container app-footer__inner">
+    <span>Сфера · платформа онлайн-записи и CRM для бизнеса</span>
+    <span class="app-footer__links">
+      <a href="{% url 'home' %}">Главная</a>
+      <a href="{% url 'register' %}">Создать страницу бизнеса</a>
+      <a href="/admin/">Админка</a>
+    </span>
+  </div>
+</footer>
+
+<div id="flash-area" class="flash-area" role="status" aria-live="polite"></div>
+
+<script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'js/app.js' %}?v={{ asset_version }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

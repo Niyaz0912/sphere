@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Аналитика — Сфера{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Деньги и услуги</p>
+    <h1>Аналитика</h1>
+    <p class="page-sub">Визиты и оплаты за период: {{ period_label|lower }}.</p>
+  </div>
+  <div class="filter-row">
+    {% for value, label in periods %}
+      <a class="filter-chip {% if period == value %}is-active{% endif %}"
+         href="?period={{ value }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="metrics metrics--4">
+  <article class="metric-card metric-card--accent">
+    <span class="metric-label">Выручка</span>
+    <span class="metric-value">{{ finance.revenue|rub }}</span>
+    <span class="metric-note">
+      {{ finance.paid_orders|ru_plural:"оплаченный визит,оплаченных визита,оплаченных визитов" }}
+      · записей всего {{ finance.orders_count }}
+    </span>
+  </article>
+
+  <article class="metric-card">
+    <span class="metric-label">Чистая прибыль</span>
+    <span class="metric-value {% if finance.profit < 0 %}is-negative{% endif %}">{{ finance.profit|rub }}</span>
+    <span class="metric-note">
+      материалы {{ finance.cost|rub }} · маржа {{ finance.margin|floatformat:1 }}%
+    </span>
+  </article>
+
+  <article class="metric-card">
+    <span class="metric-label">Средний чек</span>
+    <span class="metric-value">{{ finance.avg_check|rub }}</span>
+    <span class="metric-note">по оплаченным визитам</span>
+  </article>
+
+  <article class="metric-card">
+    <span class="metric-label">Не оплачено</span>
+    <span class="metric-value {% if finance.debt_total > 0 %}is-negative{% endif %}">{{ finance.debt_total|rub }}</span>
+    <span class="metric-note">остаток по записям периода</span>
+  </article>
+</div>
+
+<div class="analytics-grid">
+  <section class="card analytics-card" aria-labelledby="payments-title">
+    <div class="card-head">
+      <div>
+        <h2 id="payments-title">Способы оплаты</h2>
+        <p class="card-hint">По фактически внесённым суммам.</p>
+      </div>
+    </div>
+
+    <div class="pay-split">
+      <div class="pay-card">
+        <span class="pay-card__icon">{% svg_icon "wallet" 18 %}</span>
+        <span class="pay-card__label">Наличные</span>
+        <span class="pay-card__value">{{ finance.cash.total|rub }}</span>
+        <span class="pay-card__count">{{ finance.cash.count|ru_plural:"чек,чека,чеков" }}</span>
+      </div>
+      <div class="pay-card">
+        <span class="pay-card__icon">{% svg_icon "credit-card" 18 %}</span>
+        <span class="pay-card__label">Карта</span>
+        <span class="pay-card__value">{{ finance.card.total|rub }}</span>
+        <span class="pay-card__count">{{ finance.card.count|ru_plural:"чек,чека,чеков" }}</span>
+      </div>
+    </div>
+
+    {% if finance.other.count %}
+      <p class="analytics-hint">
+        Без указанного способа оплаты: {{ finance.other.total|rub }} · {{ finance.other.count }} шт.
+      </p>
+    {% endif %}
+    {% if finance.missing_cost_count %}
+      <p class="analytics-hint analytics-hint--warn">
+        У {{ finance.missing_cost_count }} услуг не заполнена себестоимость —
+        прибыль может быть завышена.
+      </p>
+    {% endif %}
+  </section>
+
+  <section class="card analytics-card analytics-card--wide" aria-labelledby="top-title">
+    <div class="card-head">
+      <div>
+        <h2 id="top-title">Топ-5 услуг</h2>
+        <p class="card-hint">По выручке среди оплаченных визитов за период.</p>
+      </div>
+      <span class="badge text-bg-light border">завершено: {{ finance.completed_count }}</span>
+    </div>
+
+    {% if top_services %}
+      <div class="table-responsive">
+        <table class="table app-table analytics-table mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Услуга</th>
+              <th scope="col" class="text-end">Записей</th>
+              <th scope="col" class="text-end">Выручка</th>
+              <th scope="col" class="text-end">Прибыль</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in top_services %}
+              <tr>
+                <td>{{ row.name }}</td>
+                <td class="text-end">{{ row.count }}</td>
+                <td class="text-end tabular fw-semibold">{{ row.revenue|rub }}</td>
+                <td class="text-end tabular">{{ row.profit|rub }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        {% svg_icon "chart" 24 %}
+        <h2>Пока нет оплат</h2>
+        <p>Как только примете оплату по записи, здесь появится топ услуг.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+<p class="analytics-note">
+  {% svg_icon "alert" 15 %}
+  Выручка считается по сумме «Оплачено» у записей с датой визита в выбранном периоде.
+  Прибыль = оплачено − себестоимость материалов по визитам, где была оплата.
+  Себестоимость берётся из текущего прайса услуги.
+</p>
+{% endblock %}

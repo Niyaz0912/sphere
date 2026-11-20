@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Регистрация бизнеса — Сфера{% endblock %}
+
+{% block content %}
+<div class="auth auth--register">
+  <section class="auth__aside">
+    <span class="eyebrow eyebrow--light">Онлайн-запись и CRM для бизнеса</span>
+    <h1>Ваша страница бизнеса начинается за минуту</h1>
+    <p class="auth__lead">
+      Публичная страница с прайсом, онлайн-запись, воронка заказов и клиентская
+      база — бесплатно и без установки.
+    </p>
+    <ul class="auth__features">
+      <li>{% svg_icon "external" 18 %} Страница <strong>/s/ваш-адрес/</strong> для клиентов</li>
+      <li>{% svg_icon "dashboard" 18 %} Готовая воронка под ваш тип услуг</li>
+      <li>{% svg_icon "wallet" 18 %} Учёт предоплат, долгов и себестоимости</li>
+      <li>{% svg_icon "download" 18 %} Excel-обмен прайсом</li>
+    </ul>
+    <div class="auth__note">
+      {% svg_icon "check-circle" 18 %}
+      <span>Всё локально: без внешних CDN и подписок. Данные — только ваши.</span>
+    </div>
+  </section>
+
+  <section class="auth__card">
+    <div class="card auth-card">
+      <div class="auth-card__head">
+        <div>
+          <h2>Создать страницу бизнеса</h2>
+          <p>Заполните четыре поля — остальное настроите позже</p>
+        </div>
+      </div>
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+          {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+        </div>
+      {% endif %}
+
+      <form method="post" class="auth-card__form" novalidate>
+        {% csrf_token %}
+        {% include "partials/form_field.html" with field=form.username %}
+        {% include "partials/form_field.html" with field=form.business_name %}
+
+        <fieldset class="mb-3">
+          <legend class="form-label">Шаблон воронки</legend>
+          <div class="choice-grid">
+            {% for radio in form.funnel_template %}
+              <label class="choice-card" for="{{ radio.id_for_label }}">
+                {{ radio.tag }}
+                <span class="choice-card__body">
+                  <span class="choice-card__title">{{ radio.choice_label }}</span>
+                  <span class="choice-card__desc">
+                    {% if radio.data.value == "quick" %}
+                      Новая заявка → Подтверждено → В работе → Выполнено
+                    {% else %}
+                      Новая заявка → Замер → Предоплата → Изготовление → Выполнено
+                    {% endif %}
+                  </span>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+          {% for error in form.funnel_template.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </fieldset>
+
+        {% include "partials/form_field.html" with field=form.password1 %}
+        {% include "partials/form_field.html" with field=form.password2 %}
+
+        <button class="btn btn-primary w-100 btn-lg" type="submit">Создать страницу бизнеса</button>
+        <p class="auth-card__terms">
+          Нажимая кнопку, вы создаёте локальный аккаунт. Пароль можно сменить в админке.
+        </p>
+      </form>
+
+      <p class="auth-card__switch">
+        Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a>
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock %}

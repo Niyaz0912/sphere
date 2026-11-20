@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}{{ title }} — Сфера{% endblock %}
+
+{% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'core:client_list' %}">Клиенты</a>
+  {% svg_icon "chevron-right" 14 %}
+  <span>{% if is_edit %}{{ client.name }}{% else %}Новый клиент{% endif %}</span>
+</nav>
+
+<div class="form-page">
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">База клиентов</p>
+      <h1>{{ title }}</h1>
+      <p class="page-sub">
+        {% if is_edit %}
+          Обновите контакты и постоянные заметки.
+        {% else %}
+          Контакты и объект клиента нужны для истории обслуживания и напоминаний.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <form method="post" class="card form-card" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="form-grid">
+      {% include "partials/form_field.html" with field=form.name %}
+      {% include "partials/form_field.html" with field=form.phone %}
+      {% include "partials/form_field.html" with field=form.identifier %}
+    </div>
+    {% include "partials/form_field.html" with field=form.notes %}
+
+    <div class="form-actions">
+      <a class="btn btn-outline-secondary" href="{% if is_edit %}{% url 'core:client_detail' client.pk %}{% else %}{% url 'core:client_list' %}{% endif %}">
+        Отмена
+      </a>
+      <button class="btn btn-primary" type="submit">
+        {% if is_edit %}Сохранить изменения{% else %}Добавить клиента{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

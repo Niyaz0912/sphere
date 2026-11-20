@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Услуги — Сфера{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Прайс</p>
+    <h1>Услуги</h1>
+    <p class="page-sub">
+      {{ services|length|ru_plural:"услуга,услуги,услуг" }} в прайсе ·
+      {{ active_count }} на публичной странице ·
+      <a class="link-quiet" href="{{ public_url }}" target="_blank" rel="noopener">посмотреть</a>
+    </p>
+  </div>
+  <div class="page-head__actions">
+    <div class="btn-group-actions">
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'shop:service_export' %}">
+        {% svg_icon "download" 15 %} Экспорт
+      </a>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'shop:service_template' %}">
+        {% svg_icon "upload" 15 %} Шаблон
+      </a>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'shop:service_import' %}">
+        {% svg_icon "upload" 15 %} Импорт
+      </a>
+    </div>
+    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#serviceModal"
+            data-service-empty="1">
+      {% svg_icon "plus" 16 %} Добавить услугу
+    </button>
+  </div>
+</div>
+
+{% if show_onboarding %}
+  <div class="onboarding-banner" role="status">
+    <span class="onboarding-banner__icon">{% svg_icon "sparkles" 20 %}</span>
+    <div>
+      <strong>Шаг 1: Создайте хотя бы одну услугу, чтобы клиенты могли записываться на вашу страницу</strong>
+      <p>Добавьте название, цену и длительность — услуга сразу появится в онлайн-записи.</p>
+    </div>
+    <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="modal"
+            data-bs-target="#serviceModal" data-service-empty="1">
+      Добавить услугу
+    </button>
+  </div>
+{% endif %}
+
+{% include "partials/public_link_card.html" %}
+
+<div class="card table-card">
+  <div class="table-responsive">
+    <table class="table app-table services-table mb-0">
+      <thead>
+        <tr>
+          <th scope="col">Услуга</th>
+          <th scope="col" class="text-end">Цена</th>
+          <th scope="col" class="text-end">Себестоимость</th>
+          <th scope="col" class="text-end">Маржа</th>
+          <th scope="col" class="text-end">Длительность</th>
+          <th scope="col">Статус</th>
+          <th scope="col" class="text-end">Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for service in services %}
+          <tr data-service-row="{{ service.pk }}">
+            <td data-label="Услуга">
+              <span class="service-name">{{ service.name }}</span>
+            </td>
+            <td data-label="Цена" class="text-end tabular fw-semibold">{{ service.price|rub }}</td>
+            <td data-label="Себестоимость" class="text-end tabular">{{ service.cost_price|rub }}</td>
+            <td data-label="Маржа" class="text-end tabular {% if service.margin < 0 %}is-negative{% endif %}">
+              {{ service.margin|rub }}<span class="margin-note">{{ service.margin_percent }}%</span>
+            </td>
+            <td data-label="Длительность" class="text-end">{{ service.duration_label }}</td>
+            <td data-label="Статус">
+              {% if service.is_active %}
+                <span class="status-pill status-pill--on">на странице</span>
+              {% else %}
+                <span class="status-pill status-pill--off">скрыта</span>
+              {% endif %}
+            </td>
+            <td data-label="Действия" class="text-end">
+              <div class="row-actions">
+                <button type="button" class="btn btn-icon btn-sm" title="Изменить услугу"
+                        aria-label="Изменить услугу {{ service.name }}"
+                        data-bs-toggle="modal" data-bs-target="#serviceModal"
+                        data-service-id="{{ service.pk }}"
+                        data-service-name="{{ service.name }}"
+                        data-service-price="{{ service.price }}"
+                        data-service-cost="{{ service.cost_price }}"
+                        data-service-duration="{{ service.duration_minutes }}"
+                        data-service-active="{% if service.is_active %}1{% else %}0{% endif %}">
+                  {% svg_icon "edit" 15 %}
+                </button>
+                <button type="button" class="btn btn-icon btn-sm btn-icon--danger" title="Удалить услугу"
+                        aria-label="Удалить услугу {{ service.name }}"
+                        data-bs-toggle="modal" data-bs-target="#serviceDeleteModal"
+                        data-delete-url="{% url 'shop:service_delete' service.pk %}"
+                        data-service-name="{{ service.name }}">
+                  {% svg_icon "trash" 15 %}
+                </button>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr class="empty-row">
+            <td colspan="7">
+              <div class="empty-state">
+                {% svg_icon "tools" 26 %}
+                <h2>Прайс пока пуст</h2>
+                <p>Добавьте первую услугу — она появится на публичной странице и в записях.</p>
+                <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="modal"
+                        data-bs-target="#serviceModal" data-service-empty="1">
+                  Добавить услугу
+                </button>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="table-foot">
+    <span class="text-muted">Импорт и экспорт — Excel (.xlsx). Импорт обновляет совпадения по названию.</span>
+    <a class="link-quiet" href="{% url 'shop:service_import' %}">Правила импорта</a>
+  </div>
+</div>
+
+{# ------------------------------ Модалка услуги ------------------------------ #}
+<div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="service-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="service-form" method="post" action="{% url 'shop:service_save' %}" data-ajax-form="service-save" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="id" id="service-id" value="">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title h5" id="service-modal-title">Новая услуга</h2>
+            <p class="modal-subtitle">Название, цена и материалы — этого достаточно.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="{{ service_form.name.id_for_label }}">Название<span class="req">*</span></label>
+            {{ service_form.name }}
+            <span class="invalid-feedback d-block" data-field-error="name"></span>
+          </div>
+
+          <div class="form-grid form-grid--2">
+            <div class="mb-3">
+              <label class="form-label" for="{{ service_form.price.id_for_label }}">Цена, ₽<span class="req">*</span></label>
+              {{ service_form.price }}
+              <span class="invalid-feedback d-block" data-field-error="price"></span>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="{{ service_form.cost_price.id_for_label }}">Себестоимость, ₽</label>
+              {{ service_form.cost_price }}
+              <span class="invalid-feedback d-block" data-field-error="cost_price"></span>
+              <div class="form-text">Расходники: масло, краска, фурнитура.</div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="{{ service_form.duration_minutes.id_for_label }}">Длительность, мин</label>
+            {{ service_form.duration_minutes }}
+            <span class="invalid-feedback d-block" data-field-error="duration_minutes"></span>
+          </div>
+
+          <label class="form-check form-check-card" for="{{ service_form.is_active.id_for_label }}">
+            {{ service_form.is_active }}
+            <span>
+              <span class="form-check-card__title">Показывать на публичной странице</span>
+              <span class="form-check-card__desc">Клиенты смогут выбрать услугу при записи.</span>
+            </span>
+          </label>
+
+          <div class="form-error" data-form-error aria-live="polite"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary" id="service-submit">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ------------------------------ Удаление услуги ------------------------------ #}
+<div class="modal fade" id="serviceDeleteModal" tabindex="-1" aria-labelledby="service-delete-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <form id="service-delete-form" method="post" action="#" data-ajax-form="service-delete">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="service-delete-title">Удалить услугу?</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Услуга <strong id="service-delete-name"></strong> исчезнет из прайса.</p>
+          <p class="text-muted small mb-0">Уже созданные записи сохранят название услуги и суммы.</p>
+          <div class="form-error" data-form-error aria-live="polite"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-danger">Удалить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
