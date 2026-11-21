@@ -41,6 +41,7 @@
       <form method="post" class="auth-card__form" novalidate>
         {% csrf_token %}
         {% include "partials/form_field.html" with field=form.username %}
+        {% include "partials/form_field.html" with field=form.org_type %}
         {% include "partials/form_field.html" with field=form.business_name %}
 
         <fieldset class="mb-3">

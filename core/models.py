@@ -52,6 +52,27 @@ def unique_slug_for(username: str, *, base: str | None = None, exclude_pk=None) 
 class MasterProfile(models.Model):
     """Публичная страница и настройки мастера. Один профиль на пользователя."""
 
+    ORG_SELF = "self"
+    ORG_IP = "ip"
+    ORG_OOO = "ooo"
+    ORG_STUDIO = "studio"
+    ORG_TYPES = [
+        (ORG_SELF, "Самозанятый / Частный мастер"),
+        (ORG_IP, "Индивидуальный предприниматель (ИП)"),
+        (ORG_OOO, "Организация (ООО)"),
+        (ORG_STUDIO, "Студия / Сервис"),
+    ]
+
+    WORK_DAYS_CHOICES = [
+        ("Пн–Пт", "Пн–Пт"),
+        ("Пн–Сб", "Пн–Сб"),
+        ("Вт–Вс", "Вт–Вс"),
+        ("Без выходных (Ежедневно)", "Без выходных (Ежедневно)"),
+        ("Пн–Пт (Сб, Вс — по договорённости)", "Пн–Пт (Сб, Вс — по договорённости)"),
+        ("Пн–Сб (Вс — по предварительной записи)", "Пн–Сб (Вс — по предварительной записи)"),
+        ("По предварительной записи", "По предварительной записи"),
+    ]
+
     THEME_BLUE = "blue"
     THEME_DARK = "dark"
     THEME_ROSE = "rose"
@@ -76,7 +97,7 @@ class MasterProfile(models.Model):
         validators=[SLUG_VALIDATOR],
         help_text="Латиница, цифры и дефис. Публичная страница: /s/адрес/",
     )
-    business_name = models.CharField("Название компании", max_length=120, blank=True)
+    business_name = models.CharField("Название / Имя", max_length=120, blank=True)
     description = models.TextField(
         "Описание для клиентов",
         blank=True,
@@ -96,6 +117,13 @@ class MasterProfile(models.Model):
         choices=THEMES,
         default=THEME_BLUE,
     )
+    org_type = models.CharField(
+        "Форма деятельности",
+        max_length=16,
+        choices=ORG_TYPES,
+        default=ORG_SELF,
+    )
+    work_days = models.CharField("Рабочие дни", max_length=64, choices=WORK_DAYS_CHOICES, default="Пн–Пт")
     work_hours = models.CharField("Часы работы", max_length=64, default="09:00 - 20:00")
     is_public = models.BooleanField(
         "Показывать на главной странице «Сферы»",

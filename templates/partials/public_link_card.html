@@ -3,7 +3,7 @@
   <span class="public-link-card__icon">{% svg_icon "external" 20 %}</span>
   <div class="public-link-card__body">
     <p class="eyebrow">Публичная страница</p>
-    <a class="public-link-card__url" href="{{ public_url }}" target="_blank" rel="noopener">/s/{{ profile.slug }}/</a>
+    <a class="public-link-card__url" href="{{ public_url }}">/s/{{ profile.slug }}/</a>
     <p class="public-link-card__hint">Отправьте ссылку клиентам — они запишутся сами, без регистрации.</p>
   </div>
   <div class="public-link-card__actions">
@@ -11,8 +11,9 @@
             data-copy-text="{{ public_url }}">
       {% svg_icon "copy" 15 %} Скопировать ссылку
     </button>
-    <a class="btn btn-primary btn-sm" href="{{ public_url }}" target="_blank" rel="noopener">
+    <a class="btn btn-primary btn-sm" href="{{ public_url }}">
       {% svg_icon "external" 15 %} Открыть страницу глазами клиента
     </a>
   </div>
 </section>
+

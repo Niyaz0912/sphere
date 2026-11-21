@@ -36,8 +36,14 @@ class BootstrapFormMixin:
 class RegisterForm(BootstrapFormMixin, UserCreationForm):
     """Регистрация мастера: логин, пароль, название и шаблон воронки."""
 
+    org_type = forms.ChoiceField(
+        label="Форма работы",
+        choices=MasterProfile.ORG_TYPES,
+        initial=MasterProfile.ORG_SELF,
+        required=False,
+    )
     business_name = forms.CharField(
-        label="Название компании",
+        label="Название или Имя / ИП",
         max_length=120,
         widget=forms.TextInput(
             attrs={"placeholder": "Например, Студия «Сфера»", "autocomplete": "organization"}
@@ -93,6 +99,7 @@ class RegisterForm(BootstrapFormMixin, UserCreationForm):
             return user
 
         profile = MasterProfile.for_user(user)
+        profile.org_type = self.cleaned_data.get("org_type") or MasterProfile.ORG_SELF
         profile.business_name = self.cleaned_data["business_name"].strip()
         profile.slug = unique_slug_for(
             user.get_username(), exclude_pk=profile.pk
@@ -111,12 +118,14 @@ class MasterProfileForm(BootstrapFormMixin, forms.ModelForm):
         model = MasterProfile
         fields = [
             "slug",
+            "org_type",
             "business_name",
             "description",
             "phone",
             "telegram",
             "address",
             "theme",
+            "work_days",
             "work_hours",
             "is_public",
         ]
@@ -136,10 +145,18 @@ class MasterProfileForm(BootstrapFormMixin, forms.ModelForm):
             "address": forms.TextInput(
                 attrs={"placeholder": "г. Москва, ул. Примерная, 10"}
             ),
+            "work_days": forms.Select(),
             "work_hours": forms.TextInput(attrs={"placeholder": "09:00 - 20:00"}),
             "theme": forms.RadioSelect,
             "is_public": forms.CheckboxInput,
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "org_type" in self.fields:
+            self.fields["org_type"].required = False
+        if "work_days" in self.fields:
+            self.fields["work_days"].required = False
 
     def clean_slug(self):
         raw = (self.cleaned_data.get("slug") or "").strip()
@@ -173,6 +190,12 @@ class MasterProfileForm(BootstrapFormMixin, forms.ModelForm):
         if not value:
             raise forms.ValidationError("Укажите название компании.")
         return value
+
+    def clean_org_type(self):
+        return self.cleaned_data.get("org_type") or MasterProfile.ORG_SELF
+
+    def clean_work_days(self):
+        return self.cleaned_data.get("work_days") or "Пн–Пт"
 
     def clean_work_hours(self):
         value = (self.cleaned_data.get("work_hours") or "").strip()

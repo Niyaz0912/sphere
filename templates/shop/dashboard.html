@@ -10,7 +10,7 @@
     <p class="page-sub">Записи, оплаты и воронка — в одном месте.</p>
   </div>
   <div class="page-head__actions">
-    <a class="btn btn-outline-secondary" href="{{ profile.get_absolute_url }}" target="_blank" rel="noopener">
+    <a class="btn btn-outline-secondary" href="{{ profile.get_absolute_url }}">
       {% svg_icon "external" 16 %} Моя страница
     </a>
     {% if has_services %}
@@ -458,3 +458,4 @@
   </div>
 </div>
 {% endblock %}
+

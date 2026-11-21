@@ -58,7 +58,7 @@
         </select>
         {% for error in form.client.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
         <div class="form-text">
-          Нет в списке? <a href="{% url 'core:client_add' %}" target="_blank" rel="noopener">Добавить клиента</a>.
+          Нет в списке? <a href="{% url 'core:client_add' %}">Добавить клиента</a>.
         </div>
       </div>
 
@@ -129,3 +129,4 @@
   </aside>
 </div>
 {% endblock %}
+

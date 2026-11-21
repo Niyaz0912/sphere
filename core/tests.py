@@ -443,7 +443,7 @@ class SettingsTests(TestCase):
         self.assertContains(response, "Публичная страница")
         self.assertContains(response, "Этапы воронки")
         self.assertContains(response, "Быстрые услуги")
-        self.assertContains(response, "Показывать компанию на главной странице")
+        self.assertContains(response, "Показывать страницу в каталоге на главной Сферы")
 
     def test_profile_update(self):
         response = self.client.post(reverse("settings"), self.profile_payload())
@@ -699,7 +699,7 @@ class PublicPageTests(TestCase):
         self.assertContains(
             response, f'data-book-service="{self.active_service.pk}"'
         )
-        self.assertContains(response, "data-book-general")
+        self.assertNotContains(response, "data-book-general")
 
     def test_unknown_slug_returns_404(self):
         response = self.client.get(
@@ -786,3 +786,42 @@ class PublicPageTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["service"], self.active_service)
         self.assertGreater(form.cleaned_data["scheduled_at"], timezone.now())
+
+
+class HardeningSecurityAndEdgeTests(TestCase):
+    """Жёсткая проверка: изоляция данных, новые поля, XSS и граничные значения."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.owner1 = User.objects.create_user("master_one", password="StrongPass123!")
+        self.owner2 = User.objects.create_user("master_two", password="StrongPass123!")
+        self.profile1 = MasterProfile.for_user(self.owner1)
+        self.profile2 = MasterProfile.for_user(self.owner2)
+
+    def test_all_org_types_and_work_days_valid(self):
+        for org_val, _ in MasterProfile.ORG_TYPES:
+            for days_val, _ in MasterProfile.WORK_DAYS_CHOICES:
+                self.profile1.org_type = org_val
+                self.profile1.work_days = days_val
+                self.profile1.full_clean()
+                self.profile1.save()
+                resp = self.client.get(self.profile1.get_absolute_url())
+                self.assertEqual(resp.status_code, 200)
+                self.assertContains(resp, days_val)
+
+    def test_cross_tenant_client_isolation(self):
+        c2 = Client.objects.create(owner=self.owner2, name="Секретный Клиент", phone="+79990001122")
+        self.client.force_login(self.owner1)
+        resp = self.client.get(reverse("core:client_detail", kwargs={"pk": c2.pk}))
+        self.assertEqual(resp.status_code, 404)
+        resp_list = self.client.get(reverse("core:client_list"))
+        self.assertNotContains(resp_list, "Секретный Клиент")
+
+    def test_xss_escaped_on_public_page(self):
+        self.profile1.business_name = "<script>alert(1)</script>Студия"
+        self.profile1.description = "<img src=x onerror=alert(2)>"
+        self.profile1.save()
+        resp = self.client.get(self.profile1.get_absolute_url())
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "<script>alert(1)</script>")
+        self.assertNotContains(resp, "<img src=x onerror=alert(2)>")

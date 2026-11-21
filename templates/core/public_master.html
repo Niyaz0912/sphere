@@ -2,11 +2,7 @@
 {% load sfera %}
 {% block title %}{{ profile.display_name }} — услуги и онлайн-запись{% endblock %}
 
-{% block header_action %}
-  {% if services %}
-    <a class="btn btn-public-primary btn-sm" href="#booking" data-book-general>Записаться</a>
-  {% endif %}
-{% endblock %}
+{% block header_action %}{% endblock %}
 
 {% block content %}
 <section class="public-hero">
@@ -16,16 +12,19 @@
 
     <div class="public-hero__body">
       <p class="public-kicker">
-        {% svg_icon "check-circle" 15 %} Компания принимает онлайн-записи
+        {% svg_icon "check-circle" 15 %} {{ profile.get_org_type_display }} · Онлайн-запись открыта
       </p>
       <h1>{{ profile.display_name }}</h1>
       {% if profile.description %}
         <div class="public-desc">{{ profile.description|linebreaks }}</div>
       {% else %}
-        <p class="public-desc">Выберите услугу и удобное время — компания подтвердит запись и стоимость.</p>
+        <p class="public-desc">Выберите услугу и удобное время — мы подтвердим запись и стоимость.</p>
       {% endif %}
 
       <div class="public-meta">
+        {% if profile.work_days %}
+          <span class="public-meta__item">{% svg_icon "calendar" 16 %} {{ profile.work_days }}</span>
+        {% endif %}
         {% if profile.work_hours %}
           <span class="public-meta__item">{% svg_icon "clock" 16 %} {{ profile.work_hours }}</span>
         {% endif %}
@@ -36,7 +35,7 @@
           <a class="public-meta__item" href="{{ profile.phone_href }}">{% svg_icon "phone" 16 %} {{ profile.phone }}</a>
         {% endif %}
         {% if profile.telegram_url %}
-          <a class="public-meta__item" href="{{ profile.telegram_url }}" target="_blank" rel="noopener">{% svg_icon "telegram" 16 %} {{ profile.telegram_handle }}</a>
+          <a class="public-meta__item" href="{{ profile.telegram_url }}">{% svg_icon "telegram" 16 %} {{ profile.telegram_handle }}</a>
         {% endif %}
       </div>
     </div>
@@ -49,7 +48,7 @@
       <span class="public-success__icon">{% svg_icon "check" 22 %}</span>
       <div>
         <strong>Заявка отправлена!</strong>
-        <p>Компания свяжется с вами, чтобы подтвердить дату и время. Если планы изменятся — просто позвоните.</p>
+        <p>Мы свяжемся с вами, чтобы подтвердить дату и время. Если планы изменятся — просто позвоните.</p>
       </div>
       <a class="btn btn-public-ghost btn-sm" href="{{ profile.get_absolute_url }}">Записаться ещё</a>
     </div>
@@ -81,7 +80,7 @@
         {% empty %}
           <div class="public-empty">
             {% svg_icon "tools" 22 %}
-            <p>Прайс пока не заполнен. Позвоните компании — здесь подскажут стоимость и время.</p>
+            <p>Прайс пока не заполнен. Свяжитесь с нами — здесь подскажут стоимость и время.</p>
           </div>
         {% endfor %}
       </div>
@@ -90,7 +89,7 @@
         <h3>Как проходит запись</h3>
         <ol>
           <li><span>1</span> Выбираете услугу и удобное время.</li>
-          <li><span>2</span> Компания подтверждает запись по телефону.</li>
+          <li><span>2</span> Мы подтверждаем запись по телефону.</li>
           <li><span>3</span> Приходите в назначенное время — все детали уже записаны.</li>
         </ol>
       </div>
@@ -102,7 +101,7 @@
         <span class="public-card__badge">без предоплаты</span>
       </div>
       <p class="public-booking__hint">
-        Оставьте заявку — компания перезвонит и подтвердит время.
+        Оставьте заявку — мы перезвоним и подтвердим время.
       </p>
 
       {% if services %}
@@ -130,7 +129,7 @@
       {% else %}
         <div class="public-empty public-empty--booking">
           {% svg_icon "phone" 24 %}
-          <p>Онлайн-запись временно недоступна. Позвоните компании напрямую:</p>
+          <p>Онлайн-запись временно недоступна. Свяжитесь с нами напрямую:</p>
           {% if profile.phone %}
             <a class="btn btn-public-primary" href="{{ profile.phone_href }}">{{ profile.phone }}</a>
           {% endif %}
@@ -140,3 +139,4 @@
   </div>
 </main>
 {% endblock %}
+

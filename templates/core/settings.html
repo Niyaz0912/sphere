@@ -7,10 +7,10 @@
   <div>
     <p class="eyebrow">Настройки</p>
     <h1>Публичная страница и воронка</h1>
-    <p class="page-sub">Так клиенты видят вашу компанию и так движутся заказы.</p>
+    <p class="page-sub">Так клиенты видят вашу страницу и так движутся заказы.</p>
   </div>
   <div class="page-head__actions">
-    <a class="btn btn-outline-primary" href="{{ public_url }}" target="_blank" rel="noopener">
+    <a class="btn btn-outline-primary" href="{{ public_url }}">
       {% svg_icon "external" 16 %} Открыть страницу
     </a>
   </div>
@@ -45,6 +45,7 @@
         <div class="form-text">Только латиница, цифры и дефис. Ссылку можно менять.</div>
         {% for error in form.slug.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
       </div>
+      {% include "partials/form_field.html" with field=form.org_type %}
       {% include "partials/form_field.html" with field=form.business_name %}
     </div>
 
@@ -54,6 +55,7 @@
       {% include "partials/form_field.html" with field=form.phone %}
       {% include "partials/form_field.html" with field=form.telegram %}
       {% include "partials/form_field.html" with field=form.address %}
+      {% include "partials/form_field.html" with field=form.work_days %}
       {% include "partials/form_field.html" with field=form.work_hours %}
     </div>
 
@@ -74,8 +76,8 @@
     <label class="form-check form-check-card mb-3" for="{{ form.is_public.id_for_label }}">
       {{ form.is_public }}
       <span>
-        <span class="form-check-card__title">Показывать компанию на главной странице Сферы</span>
-        <span class="form-check-card__desc">Компания появится в витрине площадки. Страницу по прямой ссылке это не отключает.</span>
+        <span class="form-check-card__title">Показывать страницу в каталоге на главной Сферы</span>
+        <span class="form-check-card__desc">Страница появится в витрине площадки. Страницу по прямой ссылке это не отключает.</span>
       </span>
     </label>
     {% for error in form.is_public.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
@@ -89,7 +91,7 @@
   <aside class="settings-aside">
     <div class="card info-card">
       <h2>{% svg_icon "external" 17 %} Ваша ссылка</h2>
-      <a class="public-link" href="{{ public_url }}" target="_blank" rel="noopener">{{ public_url }}</a>
+      <a class="public-link" href="{{ public_url }}">{{ public_url }}</a>
       <p class="card-hint">Скопируйте её в Instagram, Telegram или на визитку. Клиенту не нужно регистрироваться.</p>
       <button type="button" class="btn btn-outline-primary btn-sm js-copy" data-copy-text="{{ public_url }}">
         {% svg_icon "copy" 15 %} Скопировать ссылку
@@ -198,3 +200,4 @@
   </form>
 </section>
 {% endblock %}
+
