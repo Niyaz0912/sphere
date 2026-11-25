@@ -4,4 +4,7 @@ __pycache__/
 venv/
 db.sqlite3
 staticfiles/
+media/
+test-media-*/
+test-public-media-*/
 *.log

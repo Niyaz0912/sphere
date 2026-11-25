@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% load sfera %}
+{% block title %}Акции и партнёры — Сфера{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Маркетинг</p>
+    <h1>Акции и партнёры</h1>
+    <p class="page-sub">
+      {{ promos|length|ru_plural:"акция,акции,акций" }} ·
+      {{ active_count }} активных сейчас ·
+      <a class="link-quiet" href="{{ public_url }}">посмотреть на странице</a>
+    </p>
+  </div>
+  <div class="page-head__actions">
+    <button class="btn btn-primary" type="button" data-bs-toggle="modal"
+            data-bs-target="#promoModal" data-promo-empty="1">
+      {% svg_icon "plus" 16 %} Добавить акцию
+    </button>
+  </div>
+</div>
+
+<div class="metrics metrics--3">
+  <div class="metric-card metric-card--accent">
+    <span class="metric-label">Всего акций</span>
+    <span class="metric-value">{{ promos|length }}</span>
+    <span class="metric-note">Акции и партнёрские предложения</span>
+  </div>
+  <div class="metric-card">
+    <span class="metric-label">Активны сейчас</span>
+    <span class="metric-value">{{ active_count }}</span>
+    <span class="metric-note">Видны на публичной странице</span>
+  </div>
+  <div class="metric-card">
+    <span class="metric-label">Переходов по ссылкам</span>
+    <span class="metric-value">{{ total_clicks }}</span>
+    <span class="metric-note">Считаются автоматически</span>
+  </div>
+</div>
+
+{% include "partials/public_link_card.html" %}
+
+{% if promos %}
+  <section class="promo-admin-grid" aria-label="Список акций">
+    {% for promo in promos %}
+      <article class="promo-admin-card {% if promo.is_featured %}promo-admin-card--featured{% endif %}"
+               data-promo-card="{{ promo.pk }}">
+        <div class="promo-admin-card__head">
+          <span class="promo-badge">{{ promo.badge_text|default:"Акция" }}</span>
+          <span class="status-pill {{ promo.status_class }}">{{ promo.status_label }}</span>
+        </div>
+
+        <h2 class="promo-admin-card__title">{{ promo.title }}</h2>
+        {% if promo.description %}
+          <p class="promo-admin-card__desc">{{ promo.description|truncatechars:180 }}</p>
+        {% else %}
+          <p class="promo-admin-card__desc text-muted">Без описания — клиенты увидят только заголовок.</p>
+        {% endif %}
+
+        <div class="promo-admin-card__meta">
+          {% if promo.is_featured %}
+            <span class="promo-meta-chip promo-meta-chip--accent">
+              {% svg_icon "sparkles" 13 %} Под шапкой
+            </span>
+          {% endif %}
+          {% if promo.promo_code %}
+            <span class="promo-meta-chip">Промокод: <strong>{{ promo.promo_code }}</strong></span>
+          {% endif %}
+          {% if promo.expires_at %}
+            <span class="promo-meta-chip">{% svg_icon "calendar" 13 %} до {{ promo.expires_at|date:"d.m.Y" }}</span>
+          {% endif %}
+          {% if promo.target_url %}
+            <span class="promo-meta-chip">{% svg_icon "external" 13 %} Ссылка партнёра</span>
+          {% endif %}
+        </div>
+
+        <div class="promo-admin-card__stats">
+          <span class="promo-clicks">
+            {% svg_icon "chart" 15 %}
+            <strong>{{ promo.clicks_count }}</strong>
+            <span>{{ promo.clicks_count|ru_plural:"переход,перехода,переходов" }}</span>
+          </span>
+          <span class="promo-created">создана {{ promo.created_at|date:"d.m.Y" }}</span>
+        </div>
+
+        <div class="promo-admin-card__actions">
+          <button type="button" class="btn btn-outline-secondary btn-sm"
+                  data-bs-toggle="modal" data-bs-target="#promoModal"
+                  data-promo-id="{{ promo.pk }}"
+                  data-promo-title="{{ promo.title }}"
+                  data-promo-description="{{ promo.description }}"
+                  data-promo-badge="{{ promo.badge_text }}"
+                  data-promo-code="{{ promo.promo_code }}"
+                  data-promo-url="{{ promo.target_url }}"
+                  data-promo-expires="{{ promo.expires_at|date:'Y-m-d' }}"
+                  data-promo-featured="{% if promo.is_featured %}1{% else %}0{% endif %}"
+                  data-promo-active="{% if promo.is_active %}1{% else %}0{% endif %}">
+            {% svg_icon "edit" 15 %} Изменить
+          </button>
+
+          <form method="post" action="{% url 'shop:promo_toggle' promo.pk %}"
+                data-ajax-form="promo-toggle" class="promo-toggle-form">
+            {% csrf_token %}
+            <button class="btn btn-outline-secondary btn-sm" type="submit">
+              {% if promo.is_active %}
+                {% svg_icon "x" 15 %} Выключить
+              {% else %}
+                {% svg_icon "check" 15 %} Включить
+              {% endif %}
+            </button>
+          </form>
+
+          <button type="button" class="btn btn-icon btn-sm btn-icon--danger"
+                  title="Удалить акцию" aria-label="Удалить акцию {{ promo.title }}"
+                  data-bs-toggle="modal" data-bs-target="#promoDeleteModal"
+                  data-delete-url="{% url 'shop:promo_delete' promo.pk %}"
+                  data-promo-title="{{ promo.title }}">
+            {% svg_icon "trash" 15 %}
+          </button>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% else %}
+  <div class="card">
+    <div class="empty-state">
+      {% svg_icon "gift" 28 %}
+      <h2>Акций пока нет</h2>
+      <p>Создайте скидку на услугу или партнёрское предложение — оно появится на публичной странице.</p>
+      <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="modal"
+              data-bs-target="#promoModal" data-promo-empty="1">
+        Добавить акцию
+      </button>
+    </div>
+  </div>
+{% endif %}
+
+<div class="promo-tip">
+  {% svg_icon "alert" 15 %}
+  <span>Акции с истёкшей датой автоматически скрываются с публичной страницы. Переходы по ссылкам считаются в реальном времени.</span>
+</div>
+
+{# ------------------------------ Модалка акции ------------------------------ #}
+<div class="modal fade" id="promoModal" tabindex="-1" aria-labelledby="promo-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <form id="promo-form" method="post" action="{% url 'shop:promo_save' %}" data-ajax-form="promo-save" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="id" id="promo-id" value="">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title h5" id="promo-modal-title">Новая акция</h2>
+            <p class="modal-subtitle">Скидка, бонус или предложение партнёра.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="{{ promo_form.title.id_for_label }}">Заголовок<span class="req">*</span></label>
+            {{ promo_form.title }}
+            <span class="invalid-feedback d-block" data-field-error="title"></span>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="{{ promo_form.description.id_for_label }}">Описание предложения</label>
+            {{ promo_form.description }}
+            <span class="invalid-feedback d-block" data-field-error="description"></span>
+          </div>
+
+          <div class="form-grid form-grid--2">
+            <div class="mb-3">
+              <label class="form-label" for="{{ promo_form.badge_text.id_for_label }}">Текст бейджа</label>
+              {{ promo_form.badge_text }}
+              <span class="invalid-feedback d-block" data-field-error="badge_text"></span>
+              <div class="form-text">Акция, Партнёр, Бонус.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="{{ promo_form.promo_code.id_for_label }}">Промокод</label>
+              {{ promo_form.promo_code }}
+              <span class="invalid-feedback d-block" data-field-error="promo_code"></span>
+              <div class="form-text">Клиент сможет скопировать его в один клик.</div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="{{ promo_form.target_url.id_for_label }}">Ссылка партнёра</label>
+            {{ promo_form.target_url }}
+            <span class="invalid-feedback d-block" data-field-error="target_url"></span>
+            <div class="form-text">Кнопка «Подробнее» ведёт через редирект и считает переходы.</div>
+          </div>
+
+          <div class="form-grid form-grid--2">
+            <div class="mb-3">
+              <label class="form-label" for="{{ promo_form.expires_at.id_for_label }}">Действует до</label>
+              {{ promo_form.expires_at }}
+              <span class="invalid-feedback d-block" data-field-error="expires_at"></span>
+              <div class="form-text">Пусто — без ограничения по дате.</div>
+            </div>
+          </div>
+
+          <div class="form-grid form-grid--2">
+            <label class="form-check form-check-card" for="{{ promo_form.is_featured.id_for_label }}">
+              {{ promo_form.is_featured }}
+              <span>
+                <span class="form-check-card__title">Закрепить под шапкой</span>
+                <span class="form-check-card__desc">Главная акция месяца — отдельная карточка под профилем.</span>
+              </span>
+            </label>
+            <label class="form-check form-check-card" for="{{ promo_form.is_active.id_for_label }}">
+              {{ promo_form.is_active }}
+              <span>
+                <span class="form-check-card__title">Активна</span>
+                <span class="form-check-card__desc">Показывать на публичной странице.</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="form-error" data-form-error aria-live="polite"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary" id="promo-submit">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ------------------------------ Удаление акции ------------------------------ #}
+<div class="modal fade" id="promoDeleteModal" tabindex="-1" aria-labelledby="promo-delete-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <form id="promo-delete-form" method="post" action="#" data-ajax-form="promo-delete">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="promo-delete-title">Удалить акцию?</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Акция <strong id="promo-delete-name"></strong> исчезнет с публичной страницы.</p>
+          <p class="text-muted small mb-0">Счётчик переходов тоже будет удалён.</p>
+          <div class="form-error" data-form-error aria-live="polite"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-danger">Удалить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

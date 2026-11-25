@@ -78,10 +78,13 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Версия статики в query-строке, чтобы браузер не держал старый JS/CSS.
-ASSET_VERSION = "4.0.0"
+ASSET_VERSION = "4.2.0"
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "shop:dashboard"

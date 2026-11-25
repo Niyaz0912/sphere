@@ -1,10 +1,15 @@
 """Этапы воронки, услуги и заказы Сфера."""
 
 from decimal import Decimal
+from io import BytesIO
+from pathlib import Path
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import models
 from django.utils import timezone
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 
 class PipelineStage(models.Model):
@@ -177,6 +182,14 @@ class Service(models.Model):
     price = models.DecimalField(
         "Цена", max_digits=10, decimal_places=2, default=Decimal("0.00")
     )
+    old_price = models.DecimalField(
+        "Старая цена",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Если указать цену выше текущей, на публичной странице появится скидка.",
+    )
     cost_price = models.DecimalField(
         "Себестоимость",
         max_digits=10,
@@ -209,6 +222,20 @@ class Service(models.Model):
         return self.price - self.cost_price
 
     @property
+    def discount_percent(self) -> int:
+        """Целый процент скидки: старая цена выше текущей."""
+        if self.old_price is None or self.old_price <= self.price:
+            return 0
+        if self.old_price <= 0:
+            return 0
+        discount = (self.old_price - self.price) / self.old_price * 100
+        return int(discount.quantize(Decimal("1")))
+
+    @property
+    def has_discount(self) -> bool:
+        return self.old_price is not None and self.old_price > self.price
+
+    @property
     def margin_percent(self) -> Decimal:
         if self.price <= 0:
             return Decimal("0.00")
@@ -222,6 +249,187 @@ class Service(models.Model):
         if hours:
             return f"{hours} ч"
         return f"{minutes} мин"
+
+
+class ServicePhoto(models.Model):
+    """Фотография примера работы, привязанная к услуге мастера."""
+
+    MAX_PHOTOS = 6
+    MAX_SOURCE_SIZE = 10 * 1024 * 1024
+    MAX_SIDE = 1200
+    WEBP_QUALITY = 82
+    ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
+
+    service = models.ForeignKey(
+        Service,
+        verbose_name="Услуга",
+        on_delete=models.CASCADE,
+        related_name="photos",
+    )
+    image = models.ImageField("Фотография", upload_to="services/%Y/%m/")
+    caption = models.CharField("Подпись к фото", max_length=120, blank=True)
+    order = models.PositiveIntegerField("Порядок", default=0)
+    created_at = models.DateTimeField("Загружена", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Фотография услуги"
+        verbose_name_plural = "Фотографии услуг"
+        ordering = ["order", "id"]
+        indexes = [models.Index(fields=["service", "order"])]
+
+    def __str__(self) -> str:
+        return self.caption or f"Фото услуги «{self.service.name}»"
+
+    @classmethod
+    def validate_source_image(cls, upload):
+        """Проверяет исходный файл: размер и реальный формат изображения."""
+        if upload is None:
+            raise ValidationError("Выберите файл изображения.")
+        if getattr(upload, "size", 0) > cls.MAX_SOURCE_SIZE:
+            limit_mb = cls.MAX_SOURCE_SIZE // (1024 * 1024)
+            raise ValidationError(f"Файл больше {limit_mb} МБ.")
+
+        try:
+            with Image.open(upload) as image:
+                image_format = (image.format or "").upper()
+                image.verify()
+        except (UnidentifiedImageError, OSError, ValueError) as error:
+            raise ValidationError("Не удалось прочитать изображение.") from error
+        finally:
+            try:
+                upload.seek(0)
+            except (AttributeError, OSError):
+                pass
+
+        if image_format not in cls.ALLOWED_FORMATS:
+            raise ValidationError("Поддерживаются только JPG, PNG и WebP.")
+        return image_format
+
+    def _check_photo_limit(self) -> None:
+        if not self.service_id:
+            return
+        siblings = ServicePhoto.objects.filter(service_id=self.service_id)
+        if self.pk:
+            siblings = siblings.exclude(pk=self.pk)
+        if siblings.count() >= self.MAX_PHOTOS:
+            raise ValidationError(
+                f"К услуге можно добавить не более {self.MAX_PHOTOS} фотографий."
+            )
+
+    def _convert_to_webp(self) -> None:
+        """Поворачивает по EXIF, уменьшает до 1200 px и сохраняет в WebP."""
+        source = self.image
+        self.validate_source_image(source)
+
+        try:
+            with Image.open(source) as original:
+                image = ImageOps.exif_transpose(original)
+                image.load()
+
+                if image.mode in ("RGBA", "LA") or (
+                    image.mode == "P" and "transparency" in image.info
+                ):
+                    rgba = image.convert("RGBA")
+                    background = Image.new("RGB", rgba.size, (255, 255, 255))
+                    background.paste(rgba, mask=rgba.getchannel("A"))
+                    image = background
+                else:
+                    image = image.convert("RGB")
+
+                image.thumbnail(
+                    (self.MAX_SIDE, self.MAX_SIDE),
+                    getattr(Image, "Resampling", Image).LANCZOS,
+                )
+                buffer = BytesIO()
+                image.save(
+                    buffer,
+                    format="WEBP",
+                    quality=self.WEBP_QUALITY,
+                    method=6,
+                )
+        except ValidationError:
+            raise
+        except (UnidentifiedImageError, OSError, ValueError) as error:
+            raise ValidationError(
+                "Не удалось обработать изображение."
+            ) from error
+
+        original_name = Path(getattr(source, "name", "") or "photo").stem[:80]
+        self.image = ContentFile(
+            buffer.getvalue(), name=f"{original_name or 'photo'}.webp"
+        )
+
+    def save(self, *args, **kwargs):
+        self._check_photo_limit()
+        if self.image and not getattr(self.image, "_committed", False):
+            self._convert_to_webp()
+        super().save(*args, **kwargs)
+
+
+class PromoOffer(models.Model):
+    """Акция мастера или нативное партнёрское предложение.
+
+    Показывается на публичной странице, пока включена и не истекла дата.
+    Переходы по ссылке партнёра считаются в clicks_count.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="Мастер",
+        on_delete=models.CASCADE,
+        related_name="promo_offers",
+    )
+    title = models.CharField("Заголовок акции", max_length=120)
+    description = models.TextField("Описание предложения", blank=True)
+    badge_text = models.CharField(
+        "Текст бейджа", max_length=32, default="Акция"
+    )
+    promo_code = models.CharField("Промокод", max_length=40, blank=True)
+    target_url = models.URLField("Ссылка партнёра", blank=True)
+    is_featured = models.BooleanField(
+        "Закрепить под шапкой",
+        default=False,
+        help_text="Главная акция месяца — показывается отдельной карточкой.",
+    )
+    expires_at = models.DateField("Действует до", null=True, blank=True)
+    clicks_count = models.PositiveIntegerField("Переходов", default=0)
+    is_active = models.BooleanField("Активна", default=True)
+    created_at = models.DateTimeField("Создана", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Акция"
+        verbose_name_plural = "Акции"
+        ordering = ["-is_featured", "-created_at", "-id"]
+        indexes = [models.Index(fields=["owner", "is_active"])]
+
+    def __str__(self) -> str:
+        return self.title
+
+    @property
+    def is_expired(self) -> bool:
+        return bool(
+            self.expires_at and self.expires_at < timezone.localdate()
+        )
+
+    @property
+    def is_live(self) -> bool:
+        return self.is_active and not self.is_expired
+
+    @property
+    def status_label(self) -> str:
+        if self.is_expired:
+            return "Истекла"
+        if self.is_active:
+            return "Активна"
+        return "Выключена"
+
+    @property
+    def status_class(self) -> str:
+        return "status-pill--on" if self.is_live else "status-pill--off"
+
+    @property
+    def has_action(self) -> bool:
+        return bool(self.promo_code or self.target_url)
 
 
 class Order(models.Model):

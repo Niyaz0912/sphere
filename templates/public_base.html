@@ -9,7 +9,7 @@
   <meta name="theme-color" content="{% if profile.theme == 'dark' %}#0F172A{% elif profile.theme == 'rose' %}#E11D48{% elif profile.theme == 'emerald' %}#059669{% else %}#1e50c8{% endif %}">
   <link rel="icon" type="image/svg+xml" href="{% static 'icon/sfera.svg' %}">
   <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ asset_version }}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=5.0.0">
 </head>
 <body class="public-body theme-{{ profile.theme|default:'blue' }}">
 <div class="public-shell">
@@ -40,6 +40,6 @@
 </div>
 
 <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
-<script src="{% static 'js/app.js' %}?v={{ asset_version }}"></script>
+<script src="{% static 'js/app.js' %}?v=5.0.0"></script>
 </body>
 </html>

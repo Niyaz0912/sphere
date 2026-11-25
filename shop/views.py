@@ -3,10 +3,13 @@
 import logging
 from datetime import datetime, time, timedelta
 from decimal import Decimal
+from urllib.parse import urlsplit
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.core.exceptions import ValidationError
+from django.db.models import F
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -19,8 +22,15 @@ from core.templatetags.sfera import rub
 from . import analytics as analytics_service
 from .assistant import build_suggestions
 from .excel import export_workbook, import_workbook, template_workbook
-from .forms import OrderForm, PaymentForm, ServiceForm
-from .models import Order, PipelineStage, Service
+from .forms import (
+    OrderForm,
+    PaymentForm,
+    PromoOfferForm,
+    ServiceForm,
+    ServicePhotoCaptionForm,
+    ServicePhotoUploadForm,
+)
+from .models import Order, PipelineStage, PromoOffer, Service, ServicePhoto
 
 logger = logging.getLogger(__name__)
 
@@ -367,8 +377,29 @@ def order_advance(request, pk):
 @login_required
 def service_list(request):
     user = request.user
-    services = list(Service.objects.filter(owner=user).order_by("name"))
+    services = list(
+        Service.objects.filter(owner=user)
+        .prefetch_related("photos")
+        .order_by("name")
+    )
     profile = MasterProfile.for_user(user)
+
+    photo_service = None
+    photos = []
+    photos_param = (request.GET.get("photos") or "").strip()
+    if photos_param:
+        if not photos_param.isdigit():
+            raise Http404("Услуга не найдена")
+        photo_service = get_object_or_404(
+            Service, pk=int(photos_param), owner=user
+        )
+        photos = list(photo_service.photos.all())
+        for photo in photos:
+            photo.caption_form = ServicePhotoCaptionForm(
+                instance=photo,
+                auto_id=f"photo-caption-{photo.pk}-%s",
+            )
+
     return render(
         request,
         "shop/services.html",
@@ -379,6 +410,13 @@ def service_list(request):
             "profile": profile,
             "public_url": request.build_absolute_uri(profile.get_absolute_url()),
             "show_onboarding": not services,
+            "photo_service": photo_service,
+            "photos": photos,
+            "photo_upload_form": ServicePhotoUploadForm(),
+            "photo_limit": ServicePhoto.MAX_PHOTOS,
+            "photo_remaining": max(
+                ServicePhoto.MAX_PHOTOS - len(photos), 0
+            ),
         },
     )
 
@@ -435,6 +473,250 @@ def service_delete(request, pk):
             "redirect": reverse("shop:services"),
         }
     )
+
+
+# --------------------------------------------------------------------------- #
+# Фотографии услуг
+# --------------------------------------------------------------------------- #
+
+
+@login_required
+@require_POST
+def service_photo_upload(request, pk):
+    """Загрузка нескольких фото к услуге с проверкой лимита и форматов."""
+    service = get_object_or_404(Service, pk=pk, owner=request.user)
+    form = ServicePhotoUploadForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": _form_error(form),
+                "errors": _form_errors(form),
+            },
+            status=400,
+        )
+
+    files = form.cleaned_data.get("images") or []
+    if not isinstance(files, (list, tuple)):
+        files = [files]
+    files = [upload for upload in files if upload]
+    if not files:
+        message = "Выберите хотя бы одну фотографию."
+        return JsonResponse(
+            {"ok": False, "error": message, "errors": {"images": message}},
+            status=400,
+        )
+
+    remaining = ServicePhoto.MAX_PHOTOS - service.photos.count()
+    if remaining <= 0:
+        message = (
+            f"К услуге уже загружено {ServicePhoto.MAX_PHOTOS} фото — "
+            "удалите лишние, чтобы добавить новые."
+        )
+        return JsonResponse(
+            {"ok": False, "error": message, "errors": {"images": message}},
+            status=400,
+        )
+
+    caption = form.cleaned_data["caption"]
+    created = 0
+    skipped = []
+    for upload in files:
+        if created >= remaining:
+            skipped.append(f"{upload.name}: превышен лимит фото")
+            continue
+        try:
+            ServicePhoto.validate_source_image(upload)
+            ServicePhoto.objects.create(
+                service=service,
+                image=upload,
+                caption=caption,
+            )
+        except ValidationError as error:
+            skipped.append(f"{upload.name}: {'; '.join(error.messages)}")
+            continue
+        created += 1
+
+    if not created:
+        details = " ".join(skipped[:3])
+        message = "Не удалось загрузить фотографии. " + details
+        return JsonResponse(
+            {"ok": False, "error": message, "errors": {"images": message}},
+            status=400,
+        )
+
+    message = f"Загружено фото: {created}."
+    if skipped:
+        message += f" Пропущено: {len(skipped)}."
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": message,
+            "created": created,
+            "redirect": f"{reverse('shop:services')}?photos={service.pk}",
+        }
+    )
+
+
+@login_required
+@require_POST
+def service_photo_caption(request, pk):
+    """Меняет подпись к фото услуги текущего мастера."""
+    photo = get_object_or_404(
+        ServicePhoto.objects.select_related("service"),
+        pk=pk,
+        service__owner=request.user,
+    )
+    form = ServicePhotoCaptionForm(request.POST, instance=photo)
+    if not form.is_valid():
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": _form_error(form),
+                "errors": _form_errors(form),
+            },
+            status=400,
+        )
+    form.save()
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Подпись к фото обновлена.",
+            "redirect": f"{reverse('shop:services')}?photos={photo.service_id}",
+        }
+    )
+
+
+@login_required
+@require_POST
+def service_photo_delete(request, pk):
+    """Удаляет фото услуги текущего мастера и файл с диска."""
+    photo = get_object_or_404(
+        ServicePhoto,
+        pk=pk,
+        service__owner=request.user,
+    )
+    service_id = photo.service_id
+    photo.delete()
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Фотография удалена.",
+            "redirect": f"{reverse('shop:services')}?photos={service_id}",
+        }
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Акции и партнёрские предложения
+# --------------------------------------------------------------------------- #
+
+
+@login_required
+def promo_list(request):
+    """Кабинет акций: создание, статусы и счётчик переходов."""
+    promos = list(PromoOffer.objects.filter(owner=request.user))
+    profile = MasterProfile.for_user(request.user)
+    return render(
+        request,
+        "shop/promos.html",
+        {
+            "promos": promos,
+            "promo_form": PromoOfferForm(owner=request.user),
+            "active_count": sum(1 for promo in promos if promo.is_live),
+            "total_clicks": sum(promo.clicks_count for promo in promos),
+            "profile": profile,
+            "public_url": request.build_absolute_uri(profile.get_absolute_url()),
+        },
+    )
+
+
+@login_required
+@require_POST
+def promo_save(request):
+    user = request.user
+    promo_id = (request.POST.get("id") or "").strip()
+    instance = None
+    if promo_id:
+        if not promo_id.isdigit():
+            return JsonResponse(
+                {"ok": False, "error": "Акция не найдена.", "errors": {}},
+                status=404,
+            )
+        instance = get_object_or_404(PromoOffer, pk=promo_id, owner=user)
+
+    form = PromoOfferForm(request.POST, instance=instance, owner=user)
+    if not form.is_valid():
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": _form_error(form),
+                "errors": _form_errors(form),
+            },
+            status=400,
+        )
+
+    promo = form.save(commit=False)
+    promo.owner = user
+    promo.save()
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": (
+                "Акция обновлена: " if instance else "Акция создана: "
+            )
+            + promo.title,
+            "redirect": reverse("shop:promos"),
+        }
+    )
+
+
+@login_required
+@require_POST
+def promo_toggle(request, pk):
+    promo = get_object_or_404(PromoOffer, pk=pk, owner=request.user)
+    promo.is_active = not promo.is_active
+    promo.save(update_fields=["is_active"])
+    state = "включена" if promo.is_active else "выключена"
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": f"Акция «{promo.title}» {state}.",
+            "is_active": promo.is_active,
+            "redirect": reverse("shop:promos"),
+        }
+    )
+
+
+@login_required
+@require_POST
+def promo_delete(request, pk):
+    promo = get_object_or_404(PromoOffer, pk=pk, owner=request.user)
+    title = promo.title
+    promo.delete()
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": f"Акция удалена: {title}",
+            "redirect": reverse("shop:promos"),
+        }
+    )
+
+
+def promo_go(request, pk):
+    """Публичный переход по ссылке партнёра с атомарным подсчётом кликов."""
+    promo = get_object_or_404(PromoOffer, pk=pk)
+    target = (promo.target_url or "").strip()
+    if not promo.is_live or not target:
+        raise Http404("Акция недоступна")
+    parts = urlsplit(target)
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        raise Http404("Ссылка акции недоступна")
+
+    PromoOffer.objects.filter(pk=promo.pk).update(
+        clicks_count=F("clicks_count") + 1
+    )
+    return redirect(target)
 
 
 @login_required

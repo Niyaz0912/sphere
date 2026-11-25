@@ -1,14 +1,21 @@
 """Тесты профиля мастера, клиентов, настроек и публичной страницы."""
 
+import shutil
+import tempfile
 from datetime import datetime, time, timedelta
 from decimal import Decimal
+from io import BytesIO
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
-from shop.models import Order, PipelineStage, Service
+from shop.models import Order, PipelineStage, PromoOffer, Service, ServicePhoto
 
 from .forms import PublicBookingForm
 from .models import Client, MasterProfile, unique_slug_for
@@ -20,6 +27,33 @@ def local_at(days: int = 0, hour: int = 12, minute: int = 0):
     base = timezone.localtime() + timedelta(days=days)
     naive = datetime.combine(base.date(), time(hour, minute))
     return timezone.make_aware(naive, timezone.get_current_timezone())
+
+
+def uploaded_image(name="photo.jpg", size=(900, 600), caption_color=(37, 99, 235)):
+    buffer = BytesIO()
+    Image.new("RGB", size, caption_color).save(buffer, format="JPEG")
+    return SimpleUploadedFile(
+        name, buffer.getvalue(), content_type="image/jpeg"
+    )
+
+
+class MediaRootTestCase(TestCase):
+    """Временный MEDIA_ROOT для тестов загружаемых фотографий."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._media_dir = settings.BASE_DIR / "test-media-core"
+        shutil.rmtree(cls._media_dir, ignore_errors=True)
+        cls._media_dir.mkdir(parents=True, exist_ok=True)
+        cls._media_override = override_settings(MEDIA_ROOT=str(cls._media_dir))
+        cls._media_override.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_dir, ignore_errors=True)
 
 
 class ProfileSignalTests(TestCase):
@@ -681,6 +715,24 @@ class PublicPageTests(TestCase):
         )
         self.assertNotContains(response, "Скрытая услуга")
 
+    def test_public_page_shows_old_price_and_discount(self):
+        Service.objects.filter(pk=self.active_service.pk).update(
+            old_price=Decimal("5000.00")
+        )
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "5 000 ₽")
+        self.assertContains(response, "3 500 ₽")
+        self.assertContains(response, "-30%")
+        self.assertContains(response, "text-decoration-line-through")
+
+    def test_public_page_does_not_mark_equal_old_price_as_discount(self):
+        Service.objects.filter(pk=self.active_service.pk).update(
+            old_price=Decimal("3500.00")
+        )
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "text-decoration-line-through")
+
     def test_public_page_uses_sfera_url_and_legacy_redirect(self):
         self.assertTrue(self.url.startswith("/s/clay-studio/"))
         legacy = self.client.get("/m/clay-studio/")
@@ -786,6 +838,178 @@ class PublicPageTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["service"], self.active_service)
         self.assertGreater(form.cleaned_data["scheduled_at"], timezone.now())
+
+
+class PublicPromoTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            "promo-public", password="StrongPass123"
+        )
+        cls.profile = MasterProfile.objects.get(user=cls.user)
+        cls.profile.business_name = "Студия «Промо»"
+        cls.profile.slug = "promo-studio"
+        cls.profile.save()
+        cls.other = User.objects.create_user(
+            "promo-foreign", password="StrongPass123"
+        )
+        cls.url = reverse("public_master", kwargs={"slug": "promo-studio"})
+
+    def test_featured_and_partner_promos_are_shown(self):
+        featured = PromoOffer.objects.create(
+            owner=self.user,
+            title="Главная акция месяца",
+            description="Скидка 20% на первый визит.",
+            badge_text="Партнёр",
+            promo_code="MAIN20",
+            target_url="https://partner.example/main",
+            is_featured=True,
+            expires_at=timezone.localdate() + timedelta(days=10),
+        )
+        regular = PromoOffer.objects.create(
+            owner=self.user,
+            title="Бонус за отзыв",
+            badge_text="Бонус",
+            promo_code="REVIEW",
+            target_url="https://partner.example/review",
+        )
+
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Главная акция месяца")
+        self.assertContains(response, "Бонус за отзыв")
+        self.assertContains(response, "Акции и бонусы партнёров")
+        self.assertContains(response, 'data-copy-text="MAIN20"')
+        self.assertContains(response, 'data-copy-text="REVIEW"')
+        self.assertContains(
+            response, reverse("shop:promo_go", kwargs={"pk": featured.pk})
+        )
+        self.assertContains(
+            response, reverse("shop:promo_go", kwargs={"pk": regular.pk})
+        )
+        self.assertEqual(response.context["featured_promo"], featured)
+        self.assertEqual(list(response.context["partner_promos"]), [regular])
+
+    def test_expired_inactive_and_foreign_promos_are_hidden(self):
+        visible = PromoOffer.objects.create(
+            owner=self.user, title="Актуальная акция"
+        )
+        expired = PromoOffer.objects.create(
+            owner=self.user,
+            title="Просроченная акция",
+            expires_at=timezone.localdate() - timedelta(days=1),
+        )
+        inactive = PromoOffer.objects.create(
+            owner=self.user, title="Выключенная акция", is_active=False
+        )
+        foreign = PromoOffer.objects.create(
+            owner=self.other, title="Чужая акция"
+        )
+
+        response = self.client.get(self.url)
+        self.assertContains(response, visible.title)
+        self.assertNotContains(response, expired.title)
+        self.assertNotContains(response, inactive.title)
+        self.assertNotContains(response, foreign.title)
+        self.assertEqual(
+            list(response.context["partner_promos"]), [visible]
+        )
+        self.assertIsNone(response.context["featured_promo"])
+
+    def test_promo_expiring_today_is_visible(self):
+        promo = PromoOffer.objects.create(
+            owner=self.user,
+            title="Последний день акции",
+            expires_at=timezone.localdate(),
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, promo.title)
+
+    def test_partners_section_hidden_without_live_promos(self):
+        PromoOffer.objects.create(
+            owner=self.user,
+            title="Просроченная акция",
+            expires_at=timezone.localdate() - timedelta(days=1),
+        )
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Акции и бонусы партнёров")
+
+    def test_public_click_increments_counter(self):
+        promo = PromoOffer.objects.create(
+            owner=self.user,
+            title="Партнёрский переход",
+            target_url="https://partner.example/click",
+        )
+        response = self.client.get(
+            reverse("shop:promo_go", kwargs={"pk": promo.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"], "https://partner.example/click"
+        )
+        promo.refresh_from_db()
+        self.assertEqual(promo.clicks_count, 1)
+
+
+class PublicServicePhotoTests(MediaRootTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            "photo-public", password="StrongPass123"
+        )
+        profile = MasterProfile.objects.get(user=cls.user)
+        profile.business_name = "Керамическая мастерская"
+        profile.slug = "photo-studio"
+        profile.save()
+        cls.service = Service.objects.create(
+            owner=cls.user,
+            name="Мастер-класс по керамике",
+            price=Decimal("3500.00"),
+            is_active=True,
+        )
+        cls.photo1 = ServicePhoto.objects.create(
+            service=cls.service,
+            image=uploaded_image("public-one.jpg", size=(900, 600)),
+            caption="До и после",
+        )
+        cls.photo2 = ServicePhoto.objects.create(
+            service=cls.service,
+            image=uploaded_image("public-two.jpg", size=(600, 600)),
+            caption="",
+        )
+
+    def setUp(self):
+        self.url = reverse(
+            "public_master", kwargs={"slug": "photo-studio"}
+        )
+
+    def test_public_page_shows_photo_strip_and_lightbox(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sfera-carousel")
+        self.assertContains(response, "sfera-service-card")
+        self.assertContains(response, "js-public-photo", count=2)
+        self.assertContains(response, self.photo1.image.url)
+        self.assertContains(response, 'data-photo-caption="До и после"')
+        self.assertContains(
+            response, f'data-photo-group="{self.service.pk}"', count=2
+        )
+        self.assertContains(response, "publicPhotoModal")
+        self.assertContains(response, "public-photo-prev")
+        self.assertContains(response, "public-photo-next")
+        self.assertContains(response, "Назад")
+        self.assertContains(response, "Вперёд")
+        self.assertContains(response, "Записаться на эту услугу")
+
+    def test_public_page_prefetches_service_photos(self):
+        response = self.client.get(self.url)
+        service = next(
+            item
+            for item in response.context["services"]
+            if item.pk == self.service.pk
+        )
+        self.assertIn("photos", service._prefetched_objects_cache)
+        self.assertEqual(len(service.photos.all()), 2)
 
 
 class HardeningSecurityAndEdgeTests(TestCase):

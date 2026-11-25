@@ -37,6 +37,9 @@
         <a class="app-nav__link {% if name == 'services' or name == 'service_import' %}is-active{% endif %}" href="{% url 'shop:services' %}">
           {% svg_icon "tools" 17 %}<span>Услуги</span>
         </a>
+        <a class="app-nav__link {% if name == 'promos' %}is-active{% endif %}" href="{% url 'shop:promos' %}">
+          {% svg_icon "tag" 17 %}<span>Акции</span>
+        </a>
         <a class="app-nav__link {% if name == 'analytics' %}is-active{% endif %}" href="{% url 'shop:analytics' %}">
           {% svg_icon "chart" 17 %}<span>Аналитика</span>
         </a>

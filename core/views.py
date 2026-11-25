@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from shop.models import Order, PipelineStage, Service
+from shop.models import Order, PipelineStage, PromoOffer, Service
 
 from .forms import ClientForm, MasterProfileForm, PublicBookingForm, RegisterForm
 from .models import Client, MasterProfile
@@ -370,13 +370,28 @@ def public_master(request, slug):
         MasterProfile.objects.select_related("user"), slug=slug
     )
     owner = profile.user
-    services_qs = Service.objects.filter(owner=owner, is_active=True).order_by(
-        "price", "name"
+    services_qs = (
+        Service.objects.filter(owner=owner, is_active=True)
+        .prefetch_related("photos")
+        .order_by("price", "name")
     )
     services = list(services_qs)
     stages = list(
         PipelineStage.objects.filter(owner=owner).order_by("order", "id")
     )
+
+    today = timezone.localdate()
+    active_promos = list(
+        PromoOffer.objects.filter(owner=owner, is_active=True)
+        .filter(Q(expires_at__isnull=True) | Q(expires_at__gte=today))
+        .order_by("-is_featured", "-created_at", "-id")
+    )
+    featured_promo = next(
+        (promo for promo in active_promos if promo.is_featured), None
+    )
+    partner_promos = [
+        promo for promo in active_promos if promo is not featured_promo
+    ]
 
     if request.method == "POST":
         form = PublicBookingForm(request.POST, services=services_qs)
@@ -436,5 +451,8 @@ def public_master(request, slug):
             "services": services,
             "form": form,
             "booked": request.GET.get("booked") == "1",
+            "promos": active_promos,
+            "featured_promo": featured_promo,
+            "partner_promos": partner_promos,
         },
     )

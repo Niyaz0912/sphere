@@ -1,25 +1,75 @@
 """Тесты воронки, заказов, услуг, аналитики, Excel и демо-данных."""
 
+import shutil
+import tempfile
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
+from PIL import Image
 
 from core.models import Client, MasterProfile
 
 from .analytics import build_analytics
 from .assistant import build_suggestions
 from .excel import HEADERS, export_workbook, template_workbook
-from .models import Order, PipelineStage, Service
+from .models import (
+    Order,
+    PipelineStage,
+    PromoOffer,
+    Service,
+    ServicePhoto,
+)
 
 User = get_user_model()
+
+
+def uploaded_image(
+    name="photo.jpg",
+    size=(1600, 900),
+    image_format="JPEG",
+    color=(37, 99, 235),
+):
+    buffer = BytesIO()
+    Image.new("RGB", size, color).save(buffer, format=image_format)
+    content_type = {
+        "JPEG": "image/jpeg",
+        "PNG": "image/png",
+        "WEBP": "image/webp",
+        "GIF": "image/gif",
+    }.get(image_format, "application/octet-stream")
+    return SimpleUploadedFile(
+        name, buffer.getvalue(), content_type=content_type
+    )
+
+
+class MediaTestCase(TestCase):
+    """Общий временный MEDIA_ROOT, чтобы тесты не писали фото в проект."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._media_dir = settings.BASE_DIR / "test-media-shop"
+        shutil.rmtree(cls._media_dir, ignore_errors=True)
+        cls._media_dir.mkdir(parents=True, exist_ok=True)
+        cls._media_override = override_settings(MEDIA_ROOT=str(cls._media_dir))
+        cls._media_override.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_dir, ignore_errors=True)
 
 
 def local_at(days: int = 0, hour: int = 12, minute: int = 0):
@@ -140,6 +190,67 @@ class ServiceModelTests(TestCase):
         service = Service(price=Decimal("0.00"), cost_price=Decimal("0.00"))
         self.assertEqual(service.margin_percent, Decimal("0.00"))
         self.assertEqual(service.duration_label, "1 ч")
+
+    def test_discount_percent_from_old_price(self):
+        service = Service(
+            price=Decimal("800.00"), old_price=Decimal("1000.00")
+        )
+        self.assertTrue(service.has_discount)
+        self.assertEqual(service.discount_percent, 20)
+
+    def test_no_discount_without_or_lower_old_price(self):
+        service = Service(price=Decimal("1000.00"))
+        self.assertFalse(service.has_discount)
+        self.assertEqual(service.discount_percent, 0)
+
+        service.old_price = Decimal("900.00")
+        self.assertFalse(service.has_discount)
+        self.assertEqual(service.discount_percent, 0)
+
+
+class PromoOfferModelTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user("promo-master", password="StrongPass123")
+
+    def test_defaults_and_status(self):
+        promo = PromoOffer.objects.create(owner=self.user, title="Скидка 20%")
+        self.assertEqual(promo.badge_text, "Акция")
+        self.assertEqual(promo.clicks_count, 0)
+        self.assertTrue(promo.is_active)
+        self.assertFalse(promo.is_expired)
+        self.assertTrue(promo.is_live)
+        self.assertEqual(promo.status_label, "Активна")
+        self.assertEqual(str(promo), "Скидка 20%")
+
+    def test_expired_promo_is_not_live(self):
+        promo = PromoOffer.objects.create(
+            owner=self.user,
+            title="Старая акция",
+            expires_at=timezone.localdate() - timedelta(days=1),
+        )
+        self.assertTrue(promo.is_expired)
+        self.assertFalse(promo.is_live)
+        self.assertEqual(promo.status_label, "Истекла")
+
+    def test_disabled_promo_is_not_live(self):
+        promo = PromoOffer.objects.create(
+            owner=self.user,
+            title="Выключенная акция",
+            is_active=False,
+        )
+        self.assertFalse(promo.is_expired)
+        self.assertFalse(promo.is_live)
+        self.assertEqual(promo.status_label, "Выключена")
+
+    def test_promo_expires_today_is_still_live(self):
+        promo = PromoOffer.objects.create(
+            owner=self.user,
+            title="Последний день",
+            expires_at=timezone.localdate(),
+        )
+        self.assertFalse(promo.is_expired)
+        self.assertTrue(promo.is_live)
 
 
 class OrderModelTests(ShopBase):
@@ -818,6 +929,495 @@ class ServiceViewTests(ShopBase):
         self.assertEqual([cell.value for cell in workbook.active[1]], HEADERS)
         empty = load_workbook(template_workbook())
         self.assertEqual(empty.active.max_row, 1)
+
+
+class ServiceOldPriceTests(ShopBase):
+    def test_create_service_with_old_price(self):
+        response = self.client.post(
+            reverse("shop:service_save"),
+            {
+                "name": "Полировка с акцией",
+                "price": "4000.00",
+                "old_price": "5000.00",
+                "cost_price": "1000.00",
+                "duration_minutes": "120",
+                "is_active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        service = Service.objects.get(owner=self.user, name="Полировка с акцией")
+        self.assertEqual(service.old_price, Decimal("5000.00"))
+        self.assertEqual(service.discount_percent, 20)
+
+    def test_negative_old_price_is_rejected(self):
+        response = self.client.post(
+            reverse("shop:service_save"),
+            {
+                "name": "Минус старая цена",
+                "price": "1000.00",
+                "old_price": "-10.00",
+                "cost_price": "0.00",
+                "duration_minutes": "60",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("old_price", response.json()["errors"])
+        self.assertFalse(
+            Service.objects.filter(owner=self.user, name="Минус старая цена").exists()
+        )
+
+    def test_edit_service_sets_old_price(self):
+        response = self.client.post(
+            reverse("shop:service_save"),
+            {
+                "id": self.service.pk,
+                "name": self.service.name,
+                "price": "2000.00",
+                "old_price": "2500.00",
+                "cost_price": "500.00",
+                "duration_minutes": "90",
+                "is_active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.service.refresh_from_db()
+        self.assertEqual(self.service.old_price, Decimal("2500.00"))
+        self.assertEqual(self.service.discount_percent, 20)
+
+
+class ServicePhotoTests(MediaTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            "photo-master", password="StrongPass123"
+        )
+        cls.service = Service.objects.create(
+            owner=cls.user, name="Полировка кузова", price=Decimal("5000.00")
+        )
+        cls.other = User.objects.create_user(
+            "photo-other", password="StrongPass123"
+        )
+        cls.foreign_service = Service.objects.create(
+            owner=cls.other, name="Чужая услуга", price=Decimal("1000.00")
+        )
+
+    def setUp(self):
+        self.client.force_login(self.user)
+
+    def make_photo(self, service=None, **kwargs):
+        data = {
+            "service": service or self.service,
+            "image": uploaded_image(size=(800, 600)),
+            "caption": "Пример работы",
+        }
+        data.update(kwargs)
+        return ServicePhoto.objects.create(**data)
+
+    def test_new_photo_is_converted_to_webp_and_resized(self):
+        photo = ServicePhoto.objects.create(
+            service=self.service,
+            image=uploaded_image(size=(1600, 900)),
+            caption="До / после",
+        )
+        self.assertTrue(photo.image.name.endswith(".webp"))
+        path = Path(photo.image.path)
+        self.assertTrue(path.exists())
+        with Image.open(path) as image:
+            self.assertEqual(image.format, "WEBP")
+            self.assertEqual(image.size, (1200, 675))
+            self.assertLessEqual(max(image.size), 1200)
+
+    def test_upload_view_accepts_multiple_files(self):
+        response = self.client.post(
+            reverse(
+                "shop:service_photo_upload",
+                kwargs={"pk": self.service.pk},
+            ),
+            {
+                "images": [
+                    uploaded_image("one.jpg", size=(800, 600)),
+                    uploaded_image(
+                        "two.png", size=(640, 480), image_format="PNG"
+                    ),
+                ],
+                "caption": "Пример работы",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["created"], 2)
+        photos = list(self.service.photos.all())
+        self.assertEqual(len(photos), 2)
+        self.assertTrue(all(photo.image.name.endswith(".webp") for photo in photos))
+        self.assertTrue(all(photo.caption == "Пример работы" for photo in photos))
+
+    def test_six_photo_limit_is_enforced(self):
+        for index in range(ServicePhoto.MAX_PHOTOS):
+            self.make_photo(caption=f"Фото {index + 1}")
+
+        with self.assertRaises(ValidationError):
+            ServicePhoto.objects.create(
+                service=self.service,
+                image=uploaded_image("seven.jpg", size=(100, 100)),
+                caption="Седьмое фото",
+            )
+        self.assertEqual(
+            self.service.photos.count(), ServicePhoto.MAX_PHOTOS
+        )
+
+    def test_upload_view_rejects_when_limit_is_reached(self):
+        for index in range(ServicePhoto.MAX_PHOTOS):
+            self.make_photo(caption=f"Фото {index + 1}")
+
+        response = self.client.post(
+            reverse(
+                "shop:service_photo_upload",
+                kwargs={"pk": self.service.pk},
+            ),
+            {"images": uploaded_image("extra.jpg", size=(100, 100))},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("6", response.json()["error"])
+        self.assertEqual(
+            self.service.photos.count(), ServicePhoto.MAX_PHOTOS
+        )
+
+    def test_upload_to_foreign_service_is_404(self):
+        response = self.client.post(
+            reverse(
+                "shop:service_photo_upload",
+                kwargs={"pk": self.foreign_service.pk},
+            ),
+            {"images": uploaded_image("hack.jpg", size=(100, 100))},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(self.foreign_service.photos.exists())
+
+    def test_invalid_image_format_is_rejected(self):
+        response = self.client.post(
+            reverse(
+                "shop:service_photo_upload",
+                kwargs={"pk": self.service.pk},
+            ),
+            {
+                "images": uploaded_image(
+                    "animation.gif", size=(100, 100), image_format="GIF"
+                )
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("JPG", response.json()["error"])
+        self.assertFalse(self.service.photos.exists())
+
+    def test_oversized_source_is_rejected(self):
+        class Oversized:
+            size = ServicePhoto.MAX_SOURCE_SIZE + 1
+            name = "big.jpg"
+
+        with self.assertRaises(ValidationError):
+            ServicePhoto.validate_source_image(Oversized())
+
+    def test_delete_removes_file_from_disk(self):
+        photo = self.make_photo()
+        path = Path(photo.image.path)
+        self.assertTrue(path.exists())
+
+        response = self.client.post(
+            reverse(
+                "shop:service_photo_delete",
+                kwargs={"pk": photo.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ServicePhoto.objects.filter(pk=photo.pk).exists())
+        self.assertFalse(path.exists())
+
+    def test_caption_can_be_updated(self):
+        photo = self.make_photo(caption="Старая подпись")
+        response = self.client.post(
+            reverse(
+                "shop:service_photo_caption",
+                kwargs={"pk": photo.pk},
+            ),
+            {"caption": "Новая подпись"},
+        )
+        self.assertEqual(response.status_code, 200)
+        photo.refresh_from_db()
+        self.assertEqual(photo.caption, "Новая подпись")
+
+    def test_foreign_photo_cannot_be_changed_or_deleted(self):
+        foreign_photo = ServicePhoto.objects.create(
+            service=self.foreign_service,
+            image=uploaded_image("foreign.jpg", size=(100, 100)),
+            caption="Чужая",
+        )
+        caption_response = self.client.post(
+            reverse(
+                "shop:service_photo_caption",
+                kwargs={"pk": foreign_photo.pk},
+            ),
+            {"caption": "Взлом"},
+        )
+        delete_response = self.client.post(
+            reverse(
+                "shop:service_photo_delete",
+                kwargs={"pk": foreign_photo.pk},
+            )
+        )
+        self.assertEqual(caption_response.status_code, 404)
+        self.assertEqual(delete_response.status_code, 404)
+        foreign_photo.refresh_from_db()
+        self.assertEqual(foreign_photo.caption, "Чужая")
+
+    def test_services_page_shows_photo_counter_and_panel(self):
+        self.make_photo(caption="Красивая работа")
+
+        page = self.client.get(reverse("shop:services"))
+        self.assertContains(page, "Фото: 1 из 6")
+        self.assertContains(page, "service-photo-thumb")
+
+        panel = self.client.get(
+            f"{reverse('shop:services')}?photos={self.service.pk}"
+        )
+        self.assertEqual(panel.status_code, 200)
+        self.assertContains(panel, "Фотографии услуги")
+        self.assertContains(panel, "Фото: 1 из 6")
+        self.assertContains(panel, "Красивая работа")
+        self.assertContains(panel, 'enctype="multipart/form-data"')
+        self.assertContains(panel, "Загрузить фото")
+
+    def test_foreign_photos_panel_is_404(self):
+        response = self.client.get(
+            f"{reverse('shop:services')}?photos={self.foreign_service.pk}"
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_deleting_service_removes_photo_files(self):
+        photo = self.make_photo()
+        path = Path(photo.image.path)
+        self.assertTrue(path.exists())
+
+        response = self.client.post(
+            reverse("shop:service_delete", kwargs={"pk": self.service.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(path.exists())
+
+
+class PromoManagementTests(ShopBase):
+    def setUp(self):
+        super().setUp()
+        self.other = User.objects.create_user("promo-other", password="StrongPass123")
+        self.promo = PromoOffer.objects.create(
+            owner=self.user,
+            title="Скидка на диагностику",
+            description="Скидка 10% по промокоду.",
+            badge_text="Акция",
+            promo_code="DIAG10",
+            target_url="https://partner.example/diag",
+            is_featured=True,
+        )
+
+    def payload(self, **overrides):
+        data = {
+            "title": "Скидка на диагностику",
+            "description": "Скидка 10% по промокоду.",
+            "badge_text": "Акция",
+            "promo_code": "DIAG10",
+            "target_url": "https://partner.example/diag",
+            "is_featured": "on",
+            "expires_at": (timezone.localdate() + timedelta(days=10)).isoformat(),
+            "is_active": "on",
+        }
+        data.update(overrides)
+        return data
+
+    def test_page_requires_login(self):
+        self.client.logout()
+        response = self.client.get(reverse("shop:promos"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response["Location"])
+
+    def test_page_shows_only_own_promos_and_clicks(self):
+        PromoOffer.objects.filter(pk=self.promo.pk).update(clicks_count=7)
+        PromoOffer.objects.create(
+            owner=self.other, title="Чужая акция", badge_text="Партнёр"
+        )
+        response = self.client.get(reverse("shop:promos"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Скидка на диагностику")
+        self.assertContains(response, "<strong>7</strong>")
+        self.assertNotContains(response, "Чужая акция")
+        self.assertEqual(
+            [promo.pk for promo in response.context["promos"]], [self.promo.pk]
+        )
+
+    def test_create_promo_assigns_owner(self):
+        response = self.client.post(
+            reverse("shop:promo_save"),
+            self.payload(
+                title="Бонус к первому визиту",
+                badge_text="Бонус",
+                promo_code="FIRST",
+                target_url="https://partner.example/first",
+                is_featured="",
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        promo = PromoOffer.objects.get(
+            owner=self.user, title="Бонус к первому визиту"
+        )
+        self.assertEqual(promo.badge_text, "Бонус")
+        self.assertEqual(promo.promo_code, "FIRST")
+        self.assertEqual(promo.target_url, "https://partner.example/first")
+        self.assertFalse(promo.is_featured)
+        self.assertTrue(promo.is_active)
+
+    def test_create_promo_without_title_is_rejected(self):
+        response = self.client.post(
+            reverse("shop:promo_save"), self.payload(title="   ")
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("title", response.json()["errors"])
+        self.assertFalse(
+            PromoOffer.objects.filter(owner=self.user, title="").exists()
+        )
+
+    def test_invalid_target_url_is_rejected(self):
+        response = self.client.post(
+            reverse("shop:promo_save"),
+            self.payload(target_url="javascript:alert(1)"),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("target_url", response.json()["errors"])
+
+    def test_edit_promo(self):
+        response = self.client.post(
+            reverse("shop:promo_save"),
+            self.payload(
+                id=self.promo.pk,
+                title="Обновлённая акция",
+                badge_text="Партнёр",
+                is_featured="",
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.promo.refresh_from_db()
+        self.assertEqual(self.promo.title, "Обновлённая акция")
+        self.assertEqual(self.promo.badge_text, "Партнёр")
+        self.assertFalse(self.promo.is_featured)
+        self.assertEqual(self.promo.owner, self.user)
+
+    def test_edit_foreign_promo_is_404(self):
+        foreign = PromoOffer.objects.create(owner=self.other, title="Чужая")
+        response = self.client.post(
+            reverse("shop:promo_save"),
+            self.payload(id=foreign.pk, title="Взлом"),
+        )
+        self.assertEqual(response.status_code, 404)
+        foreign.refresh_from_db()
+        self.assertEqual(foreign.title, "Чужая")
+
+    def test_toggle_promo(self):
+        response = self.client.post(
+            reverse("shop:promo_toggle", kwargs={"pk": self.promo.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.promo.refresh_from_db()
+        self.assertFalse(self.promo.is_active)
+
+        response = self.client.post(
+            reverse("shop:promo_toggle", kwargs={"pk": self.promo.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.promo.refresh_from_db()
+        self.assertTrue(self.promo.is_active)
+
+    def test_toggle_foreign_promo_is_404(self):
+        foreign = PromoOffer.objects.create(owner=self.other, title="Чужая")
+        response = self.client.post(
+            reverse("shop:promo_toggle", kwargs={"pk": foreign.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+        foreign.refresh_from_db()
+        self.assertTrue(foreign.is_active)
+
+    def test_delete_promo(self):
+        response = self.client.post(
+            reverse("shop:promo_delete", kwargs={"pk": self.promo.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PromoOffer.objects.filter(pk=self.promo.pk).exists())
+
+    def test_delete_foreign_promo_is_404(self):
+        foreign = PromoOffer.objects.create(owner=self.other, title="Чужая")
+        response = self.client.post(
+            reverse("shop:promo_delete", kwargs={"pk": foreign.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(PromoOffer.objects.filter(pk=foreign.pk).exists())
+
+
+class PromoClickTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user("click-master", password="StrongPass123")
+        cls.promo = PromoOffer.objects.create(
+            owner=cls.user,
+            title="Партнёрский бонус",
+            target_url="https://partner.example/bonus",
+        )
+
+    def test_click_increments_counter_and_redirects(self):
+        response = self.client.get(
+            reverse("shop:promo_go", kwargs={"pk": self.promo.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://partner.example/bonus")
+        self.promo.refresh_from_db()
+        self.assertEqual(self.promo.clicks_count, 1)
+
+    def test_repeated_clicks_are_counted(self):
+        url = reverse("shop:promo_go", kwargs={"pk": self.promo.pk})
+        self.client.get(url)
+        self.client.get(url)
+        self.promo.refresh_from_db()
+        self.assertEqual(self.promo.clicks_count, 2)
+
+    def test_inactive_promo_does_not_count(self):
+        PromoOffer.objects.filter(pk=self.promo.pk).update(is_active=False)
+        response = self.client.get(
+            reverse("shop:promo_go", kwargs={"pk": self.promo.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+        self.promo.refresh_from_db()
+        self.assertEqual(self.promo.clicks_count, 0)
+
+    def test_expired_promo_does_not_count(self):
+        PromoOffer.objects.filter(pk=self.promo.pk).update(
+            expires_at=timezone.localdate() - timedelta(days=1)
+        )
+        response = self.client.get(
+            reverse("shop:promo_go", kwargs={"pk": self.promo.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+        self.promo.refresh_from_db()
+        self.assertEqual(self.promo.clicks_count, 0)
+
+    def test_promo_without_target_url_is_not_clickable(self):
+        PromoOffer.objects.filter(pk=self.promo.pk).update(target_url="")
+        response = self.client.get(
+            reverse("shop:promo_go", kwargs={"pk": self.promo.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_unknown_promo_is_404(self):
+        response = self.client.get(
+            reverse("shop:promo_go", kwargs={"pk": 999999})
+        )
+        self.assertEqual(response.status_code, 404)
 
 
 class AnalyticsTests(ShopBase):

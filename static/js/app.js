@@ -319,6 +319,10 @@
     }
     byId("id_name").value = button.getAttribute("data-service-name") || "";
     byId("id_price").value = button.getAttribute("data-service-price") || "";
+    var oldPrice = byId("id_old_price");
+    if (oldPrice) {
+      oldPrice.value = button.getAttribute("data-service-old-price") || "";
+    }
     byId("id_cost_price").value = button.getAttribute("data-service-cost") || "";
     byId("id_duration_minutes").value = button.getAttribute("data-service-duration") || "60";
     var active = byId("id_is_active");
@@ -346,6 +350,237 @@
     if (name) {
       name.textContent = button.getAttribute("data-service-name") || "";
     }
+  }
+
+  function resetPromoModal() {
+    var form = byId("promo-form");
+    if (!form) {
+      return;
+    }
+    form.reset();
+    form.action = form.getAttribute("data-action") || form.action;
+    var idInput = byId("promo-id");
+    if (idInput) {
+      idInput.value = "";
+    }
+    var active = byId("id_is_active");
+    if (active) {
+      active.checked = true;
+    }
+    var featured = byId("id_is_featured");
+    if (featured) {
+      featured.checked = false;
+    }
+    var title = byId("promo-modal-title");
+    if (title) {
+      title.textContent = "Новая акция";
+    }
+    var submit = byId("promo-submit");
+    if (submit) {
+      submit.textContent = "Создать акцию";
+    }
+    clearErrors(form);
+  }
+
+  function fillPromoModal(button) {
+    var form = byId("promo-form");
+    if (!form) {
+      return;
+    }
+    clearErrors(form);
+    var idInput = byId("promo-id");
+    if (idInput) {
+      idInput.value = button.getAttribute("data-promo-id") || "";
+    }
+    var values = {
+      id_title: button.getAttribute("data-promo-title"),
+      id_description: button.getAttribute("data-promo-description"),
+      id_badge_text: button.getAttribute("data-promo-badge"),
+      id_promo_code: button.getAttribute("data-promo-code"),
+      id_target_url: button.getAttribute("data-promo-url"),
+      id_expires_at: button.getAttribute("data-promo-expires")
+    };
+    Object.keys(values).forEach(function (id) {
+      var input = byId(id);
+      if (input) {
+        input.value = values[id] || "";
+      }
+    });
+    var featured = byId("id_is_featured");
+    if (featured) {
+      featured.checked = button.getAttribute("data-promo-featured") === "1";
+    }
+    var active = byId("id_is_active");
+    if (active) {
+      active.checked = button.getAttribute("data-promo-active") === "1";
+    }
+    var title = byId("promo-modal-title");
+    if (title) {
+      title.textContent = "Изменить акцию";
+    }
+    var submit = byId("promo-submit");
+    if (submit) {
+      submit.textContent = "Сохранить";
+    }
+  }
+
+  function fillPromoDeleteModal(button) {
+    var form = byId("promo-delete-form");
+    if (!form) {
+      return;
+    }
+    clearErrors(form);
+    form.action = button.getAttribute("data-delete-url") || "";
+    var name = byId("promo-delete-name");
+    if (name) {
+      name.textContent = button.getAttribute("data-promo-title") || "";
+    }
+  }
+
+  function setupServicesCarousel() {
+    var carousel = byId("servicesCarousel");
+    if (!carousel) {
+      return;
+    }
+    var prev = document.querySelector("[data-carousel-prev]");
+    var next = document.querySelector("[data-carousel-next]");
+    if (!prev && !next) {
+      return;
+    }
+
+    function cardStep() {
+      var card = carousel.querySelector(".sfera-service-card");
+      if (!card) {
+        return Math.max(carousel.clientWidth * 0.8, 220);
+      }
+      return card.getBoundingClientRect().width + 16;
+    }
+
+    function updateArrows() {
+      var maxScroll = carousel.scrollWidth - carousel.clientWidth;
+      if (prev) {
+        prev.disabled = carousel.scrollLeft <= 2;
+      }
+      if (next) {
+        next.disabled = carousel.scrollLeft >= maxScroll - 2;
+      }
+    }
+
+    if (prev) {
+      prev.addEventListener("click", function () {
+        carousel.scrollBy({ left: -cardStep(), behavior: "smooth" });
+      });
+    }
+    if (next) {
+      next.addEventListener("click", function () {
+        carousel.scrollBy({ left: cardStep(), behavior: "smooth" });
+      });
+    }
+
+    carousel.addEventListener("scroll", updateArrows, { passive: true });
+    window.addEventListener("resize", updateArrows);
+    updateArrows();
+  }
+
+  function setupPublicPhotoLightbox() {
+    var modalEl = byId("publicPhotoModal");
+    if (!modalEl) {
+      return;
+    }
+    var imageEl = byId("public-photo-image");
+    var captionEl = byId("public-photo-caption");
+    var serviceEl = byId("public-photo-service");
+    var counterEl = byId("public-photo-counter");
+    var prevEl = byId("public-photo-prev");
+    var nextEl = byId("public-photo-next");
+    var bookEl = byId("public-photo-book");
+    if (!imageEl || !prevEl || !nextEl) {
+      return;
+    }
+
+    var items = [];
+    var index = 0;
+
+    function renderPhoto() {
+      if (!items.length) {
+        return;
+      }
+      var item = items[index];
+      imageEl.src = item.url;
+      imageEl.alt = item.caption || item.service || "Фото услуги";
+      if (captionEl) {
+        captionEl.textContent = item.caption || "";
+        captionEl.hidden = !item.caption;
+      }
+      if (serviceEl) {
+        serviceEl.textContent = item.service || "";
+      }
+      if (counterEl) {
+        counterEl.textContent = index + 1 + " из " + items.length;
+      }
+      prevEl.disabled = index === 0;
+      nextEl.disabled = index === items.length - 1;
+      if (bookEl) {
+        bookEl.href = item.serviceId
+          ? "?service=" + encodeURIComponent(item.serviceId) + "#booking"
+          : "#booking";
+      }
+    }
+
+    function openPhoto(button) {
+      var group = button.getAttribute("data-photo-group") || "";
+      var triggers = Array.prototype.filter.call(
+        document.querySelectorAll(".js-public-photo"),
+        function (node) {
+          return node.getAttribute("data-photo-group") === group;
+        }
+      );
+      if (!triggers.length) {
+        return;
+      }
+      items = triggers.map(function (node) {
+        return {
+          url: node.getAttribute("data-photo-url") || "",
+          caption: node.getAttribute("data-photo-caption") || "",
+          service: node.getAttribute("data-photo-service") || "",
+          serviceId: node.getAttribute("data-photo-service-id") || ""
+        };
+      });
+      index = Math.max(triggers.indexOf(button), 0);
+      renderPhoto();
+      if (window.bootstrap && window.bootstrap.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+    }
+
+    document.querySelectorAll(".js-public-photo").forEach(function (button) {
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        openPhoto(button);
+      });
+    });
+
+    prevEl.addEventListener("click", function () {
+      if (index > 0) {
+        index -= 1;
+        renderPhoto();
+      }
+    });
+    nextEl.addEventListener("click", function () {
+      if (index < items.length - 1) {
+        index += 1;
+        renderPhoto();
+      }
+    });
+    modalEl.addEventListener("keydown", function (event) {
+      if (event.key === "ArrowLeft" && index > 0) {
+        index -= 1;
+        renderPhoto();
+      } else if (event.key === "ArrowRight" && index < items.length - 1) {
+        index += 1;
+        renderPhoto();
+      }
+    });
   }
 
   /* ---------------------------------------------------------------------- */
@@ -465,6 +700,76 @@
       deleteModal.addEventListener("show.bs.modal", function (event) {
         if (event.relatedTarget) {
           fillDeleteModal(event.relatedTarget);
+        }
+      });
+    }
+
+    // Модалка фотографий услуги: открывается по ?photos=<id>.
+    var photosModalEl = byId("servicePhotosModal");
+    if (photosModalEl) {
+      if (photosModalEl.getAttribute("data-open") === "1" && window.bootstrap) {
+        window.bootstrap.Modal.getOrCreateInstance(photosModalEl).show();
+      }
+      photosModalEl.addEventListener("hidden.bs.modal", function () {
+        try {
+          var url = new URL(window.location.href);
+          if (url.searchParams.has("photos")) {
+            url.searchParams.delete("photos");
+            url.hash = "";
+            window.history.replaceState(null, "", url);
+          }
+        } catch (error) {
+          /* без URL API просто оставляем адрес как есть */
+        }
+      });
+    }
+
+    // Первый клик по «Удалить» у фото просит подтверждение, второй — удаляет.
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest(".js-photo-delete");
+      if (!button) {
+        return;
+      }
+      if (button.dataset.confirmed === "1") {
+        return;
+      }
+      event.preventDefault();
+      button.dataset.confirmed = "1";
+      button.classList.add("is-confirming");
+      var label = button.querySelector(".photo-delete-label");
+      if (label) {
+        label.textContent = "Точно?";
+      }
+      window.setTimeout(function () {
+        if (!button.isConnected) {
+          return;
+        }
+        button.dataset.confirmed = "";
+        button.classList.remove("is-confirming");
+        if (label) {
+          label.textContent = "Удалить";
+        }
+      }, 3000);
+    });
+
+    // Акции и партнёрские предложения.
+    var promoModal = byId("promoModal");
+    if (promoModal) {
+      promoModal.addEventListener("show.bs.modal", function (event) {
+        var button = event.relatedTarget;
+        if (button && button.getAttribute("data-promo-id")) {
+          fillPromoModal(button);
+        } else {
+          resetPromoModal();
+        }
+      });
+    }
+
+    var promoDeleteModal = byId("promoDeleteModal");
+    if (promoDeleteModal) {
+      promoDeleteModal.addEventListener("show.bs.modal", function (event) {
+        if (event.relatedTarget) {
+          fillPromoDeleteModal(event.relatedTarget);
         }
       });
     }
@@ -621,6 +926,45 @@
       });
     });
 
+    // Копирование промокода акции с откликом прямо на кнопке.
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest(".js-copy-promo");
+      if (!button) {
+        return;
+      }
+      var text = button.getAttribute("data-copy-text") || "";
+      if (!text) {
+        return;
+      }
+      var label = button.querySelector("[data-copy-label]");
+      if (label && !button.dataset.copyOriginal) {
+        button.dataset.copyOriginal = label.textContent;
+      }
+      copyText(text)
+        .then(function () {
+          if (label) {
+            label.textContent = "Скопировано";
+          }
+          button.classList.add("is-copied");
+          window.setTimeout(function () {
+            if (label && button.dataset.copyOriginal) {
+              label.textContent = button.dataset.copyOriginal;
+            }
+            button.classList.remove("is-copied");
+          }, 2200);
+        })
+        .catch(function () {
+          if (label) {
+            label.textContent = "Не удалось скопировать";
+          }
+          window.setTimeout(function () {
+            if (label && button.dataset.copyOriginal) {
+              label.textContent = button.dataset.copyOriginal;
+            }
+          }, 2600);
+        });
+    });
+
     // Копирование текста (напоминания, ссылки).
     document.addEventListener("click", function (event) {
       var button = event.target.closest(".js-copy");
@@ -718,6 +1062,10 @@
         /* без URL API остаётся обычная якорная навигация */
       }
     }
+
+    // Витрина услуг: горизонтальная карусель и лайтбокс фотографий.
+    setupServicesCarousel();
+    setupPublicPhotoLightbox();
 
     // Имя выбранного файла в зоне загрузки.
     document.querySelectorAll(".upload-drop input[type='file']").forEach(function (input) {

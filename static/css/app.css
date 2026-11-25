@@ -2043,6 +2043,141 @@ textarea.form-control {
   font-size: 13.5px;
 }
 
+.service-photo-meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.service-photo-strip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.service-photo-thumb {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  object-fit: cover;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.photo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.photo-card__preview {
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.photo-card__preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-caption-form {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+}
+
+.photo-caption-form .form-control {
+  font-size: 12px;
+}
+
+.photo-caption-form .btn {
+  align-self: flex-start;
+  padding: 4px 9px;
+  font-size: 11.5px;
+}
+
+.photo-delete-form {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0;
+}
+
+.photo-delete-form .btn {
+  padding: 4px 9px;
+  font-size: 11.5px;
+}
+
+.photo-delete-form .btn.is-confirming {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+.photo-upload-form {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.photo-upload-form__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.photo-upload-form__head h3 {
+  margin: 0 0 2px;
+  font-size: 13px;
+}
+
+.photo-limit-note {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.photo-upload-form__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.empty-state--compact {
+  padding: 22px 14px;
+}
+
+.empty-state--compact h2 {
+  font-size: 1rem;
+}
+
 .upload-form {
   padding: 0 20px 20px;
 }
@@ -2131,6 +2266,189 @@ textarea.form-control {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   Акции и партнёрские предложения в кабинете
+   -------------------------------------------------------------------------- */
+
+.metrics--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.promo-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.promo-admin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.promo-admin-card--featured {
+  border-color: var(--brand-line);
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.promo-admin-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.promo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.promo-admin-card__title {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.3;
+}
+
+.promo-admin-card__desc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.promo-admin-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.promo-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.promo-meta-chip strong {
+  color: var(--ink);
+}
+
+.promo-meta-chip .mb-icon {
+  color: var(--muted);
+}
+
+.promo-meta-chip--accent {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
+.promo-meta-chip--accent .mb-icon {
+  color: var(--brand);
+}
+
+.promo-admin-card__stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.promo-clicks {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.promo-clicks .mb-icon {
+  color: var(--brand);
+}
+
+.promo-clicks strong {
+  color: var(--ink);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.promo-admin-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.promo-toggle-form {
+  margin: 0;
+}
+
+.promo-admin-card__actions .btn {
+  flex: 0 0 auto;
+}
+
+.promo-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.promo-tip .mb-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #94A3B8;
+}
+
+.price-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.price-old {
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: line-through;
+}
+
+.discount-pill {
+  display: inline-flex;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 10.5px;
+  font-weight: 800;
 }
 
 /* --------------------------------------------------------------------------
@@ -3149,6 +3467,405 @@ a.public-meta__item:hover {
   opacity: 0;
 }
 
+/* Акции на публичной странице */
+
+.public-featured {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  overflow: hidden;
+  margin: 0 0 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--pub-primary);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(480px 200px at 100% 0%, var(--pub-glow), transparent 72%),
+    var(--pub-surface);
+}
+
+.public-featured__glow {
+  position: absolute;
+  right: -60px;
+  top: -80px;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  border: 28px solid var(--pub-glow);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.public-featured__body {
+  position: relative;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.public-body .promo-badge {
+  background: var(--pub-soft);
+  color: var(--pub-primary);
+}
+
+.public-featured__badge {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--pub-primary);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.theme-dark .public-featured__badge {
+  color: #0B1220;
+}
+
+.public-featured h2 {
+  margin: 7px 0 5px;
+  color: var(--pub-ink);
+  font-size: 1.2rem;
+  line-height: 1.25;
+}
+
+.public-featured__desc {
+  max-width: 660px;
+  margin: 0 0 9px;
+  color: var(--pub-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.public-featured__meta {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  color: var(--pub-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.public-featured__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.public-featured__meta .mb-icon {
+  color: var(--pub-primary);
+}
+
+.public-featured__actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.price-row__prices {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.price-row__old {
+  color: var(--pub-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: line-through;
+}
+
+.promo-discount {
+  display: inline-flex;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--pub-soft);
+  color: var(--pub-primary);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.promo-partners {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pub-line);
+}
+
+.promo-partners__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+
+.promo-partners__head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--pub-ink);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.promo-partners__head .mb-icon {
+  color: var(--pub-primary);
+}
+
+.promo-partners__count {
+  color: var(--pub-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.promo-partners__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 9px;
+}
+
+.promo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--pub-line);
+  border-radius: var(--radius-sm);
+  background: var(--pub-bg);
+}
+
+.promo-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.promo-card__date {
+  color: var(--pub-muted);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.promo-card__title {
+  margin: 0;
+  color: var(--pub-ink);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.promo-card__desc {
+  margin: 0;
+  color: var(--pub-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.promo-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 3px;
+}
+
+.promo-card__actions .btn {
+  padding: 4px 9px;
+  font-size: 11.5px;
+}
+
+.promo-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px dashed var(--pub-line);
+  border-radius: var(--radius-sm);
+  background: var(--pub-surface);
+  color: var(--pub-ink);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.promo-copy-btn:hover {
+  border-color: var(--pub-primary);
+  color: var(--pub-primary);
+}
+
+.promo-copy-btn .mb-icon {
+  flex: 0 0 auto;
+  color: var(--pub-primary);
+}
+
+.promo-copy-btn.is-copied {
+  border-style: solid;
+  border-color: var(--pub-primary);
+  background: var(--pub-soft);
+  color: var(--pub-primary);
+}
+
+.promo-copy-btn--sm {
+  font-size: 11px;
+}
+
+/* Фотографии услуг на публичной странице */
+
+.price-row__photos {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.price-photo {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--pub-line);
+  border-radius: 8px;
+  background: var(--pub-bg);
+  cursor: pointer;
+}
+
+.price-photo:hover {
+  border-color: var(--pub-primary);
+  box-shadow: 0 0 0 3px var(--pub-glow);
+}
+
+.price-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.public-photo-modal .modal-content {
+  border-color: var(--pub-line);
+  background: var(--pub-surface);
+}
+
+.public-photo-modal .modal-header,
+.public-photo-modal .modal-footer {
+  border-color: var(--pub-line);
+}
+
+.public-photo-modal .modal-title {
+  color: var(--pub-ink);
+}
+
+.public-photo-modal .modal-subtitle {
+  color: var(--pub-muted);
+}
+
+.public-photo-modal__stage {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--pub-bg);
+}
+
+.public-photo-modal__stage img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 68vh;
+}
+
+.public-photo-modal__caption {
+  margin: 10px 0 0;
+  color: var(--pub-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.public-photo-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.public-photo-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.public-photo-counter {
+  min-width: 52px;
+  color: var(--pub-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.photo-arrow--back {
+  transform: rotate(180deg);
+}
+
+.public-photo-modal .btn-public-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Карусель услуг на публичной странице */
+.sfera-carousel {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 4px 2px 12px;
+  scrollbar-width: none;
+}
+
+.sfera-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.sfera-service-card {
+  flex: 0 0 260px;
+  scroll-snap-align: start;
+}
+
+.sfera-service-title {
+  display: -webkit-box;
+  min-height: 2.6em;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 620px) {
+  .sfera-service-card {
+    flex-basis: 230px;
+  }
+}
+
 /* --------------------------------------------------------------------------
    Главная страница площадки «Сфера»
    -------------------------------------------------------------------------- */
@@ -4162,6 +4879,31 @@ a.public-meta__item:hover {
   }
 
   .choice-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .promo-admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .public-featured {
+    padding: 16px;
+  }
+
+  .public-featured__actions {
+    width: 100%;
+  }
+
+  .public-featured__actions .btn,
+  .public-featured__actions .promo-copy-btn {
+    flex: 1 1 100%;
+  }
+
+  .promo-partners__grid {
     grid-template-columns: 1fr;
   }
 }

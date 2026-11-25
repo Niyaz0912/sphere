@@ -1,21 +1,30 @@
-"""Формы услуг, заказов и приёма оплаты."""
+"""Формы услуг, акций, заказов и приёма оплаты."""
 
 from decimal import Decimal
+from urllib.parse import urlsplit
 
 from django import forms
 
 from core.forms import BootstrapFormMixin
 
-from .models import Order, PipelineStage, Service
+from .models import Order, PipelineStage, PromoOffer, Service, ServicePhoto
 
 
 class ServiceForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Service
-        fields = ["name", "price", "cost_price", "duration_minutes", "is_active"]
+        fields = [
+            "name",
+            "price",
+            "old_price",
+            "cost_price",
+            "duration_minutes",
+            "is_active",
+        ]
         labels = {
             "name": "Название",
             "price": "Цена, ₽",
+            "old_price": "Старая цена, ₽",
             "cost_price": "Себестоимость, ₽",
             "duration_minutes": "Длительность, мин",
             "is_active": "Показывать на публичной странице",
@@ -25,6 +34,13 @@ class ServiceForm(BootstrapFormMixin, forms.ModelForm):
                 attrs={"placeholder": "Например, Замена масла и фильтров"}
             ),
             "price": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "old_price": forms.NumberInput(
+                attrs={
+                    "step": "0.01",
+                    "min": "0",
+                    "placeholder": "Например, 3000",
+                }
+            ),
             "cost_price": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
             "duration_minutes": forms.NumberInput(attrs={"step": "5", "min": "1"}),
         }
@@ -53,6 +69,12 @@ class ServiceForm(BootstrapFormMixin, forms.ModelForm):
             raise forms.ValidationError("Цена не может быть отрицательной.")
         return price
 
+    def clean_old_price(self):
+        old_price = self.cleaned_data.get("old_price")
+        if old_price is not None and old_price < 0:
+            raise forms.ValidationError("Старая цена не может быть отрицательной.")
+        return old_price
+
     def clean_cost_price(self):
         cost = self.cleaned_data.get("cost_price")
         if cost is None or cost < 0:
@@ -66,6 +88,173 @@ class ServiceForm(BootstrapFormMixin, forms.ModelForm):
         if duration > 1440:
             raise forms.ValidationError("Длительность не может быть больше 24 часов.")
         return duration
+
+
+class PromoOfferForm(BootstrapFormMixin, forms.ModelForm):
+    """Акция мастера или партнёрское предложение в кабинете."""
+
+    class Meta:
+        model = PromoOffer
+        fields = [
+            "title",
+            "description",
+            "badge_text",
+            "promo_code",
+            "target_url",
+            "is_featured",
+            "expires_at",
+            "is_active",
+        ]
+        labels = {
+            "title": "Заголовок акции",
+            "description": "Описание предложения",
+            "badge_text": "Текст бейджа",
+            "promo_code": "Промокод",
+            "target_url": "Ссылка партнёра",
+            "is_featured": "Закрепить под шапкой",
+            "expires_at": "Действует до",
+            "is_active": "Активна",
+        }
+        widgets = {
+            "title": forms.TextInput(
+                attrs={"placeholder": "Например, Скидка 20% на первый визит"}
+            ),
+            "description": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "placeholder": "Что получает клиент и какие условия акции.",
+                }
+            ),
+            "badge_text": forms.TextInput(
+                attrs={
+                    "placeholder": "Акция, Партнёр, Бонус",
+                    "maxlength": "32",
+                }
+            ),
+            "promo_code": forms.TextInput(
+                attrs={"placeholder": "SPRING20", "maxlength": "40"}
+            ),
+            "target_url": forms.URLInput(
+                attrs={"placeholder": "https://partner.example/promo"}
+            ),
+            "expires_at": forms.DateInput(
+                format="%Y-%m-%d", attrs={"type": "date"}
+            ),
+        }
+
+    def __init__(self, *args, owner=None, **kwargs):
+        self.owner = owner or getattr(kwargs.get("instance"), "owner", None)
+        super().__init__(*args, **kwargs)
+        self.fields["expires_at"].input_formats = ["%Y-%m-%d", "%d.%m.%Y"]
+        self.fields["title"].required = True
+        self.fields["badge_text"].required = False
+
+    def clean_title(self):
+        title = (self.cleaned_data.get("title") or "").strip()
+        if not title:
+            raise forms.ValidationError("Введите заголовок акции.")
+        return title
+
+    def clean_description(self):
+        return (self.cleaned_data.get("description") or "").strip()
+
+    def clean_badge_text(self):
+        badge = (self.cleaned_data.get("badge_text") or "").strip()
+        return badge or "Акция"
+
+    def clean_promo_code(self):
+        return (self.cleaned_data.get("promo_code") or "").strip()
+
+    def clean_target_url(self):
+        target = (self.cleaned_data.get("target_url") or "").strip()
+        if not target:
+            return ""
+        parts = urlsplit(target)
+        if parts.scheme not in ("http", "https") or not parts.netloc:
+            raise forms.ValidationError(
+                "Ссылка должна начинаться с http:// или https://."
+            )
+        return target
+
+
+class MultipleFileInput(forms.FileInput):
+    """FileInput, которому разрешено принимать несколько файлов."""
+
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    """FileField, который валидирует и возвращает список файлов."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault(
+            "widget",
+            MultipleFileInput(attrs={"multiple": True}),
+        )
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        if isinstance(data, (list, tuple)):
+            files = [
+                super(MultipleFileField, self).clean(item, initial)
+                for item in data
+                if item
+            ]
+            if not files:
+                raise forms.ValidationError(
+                    self.error_messages["required"], code="required"
+                )
+            return files
+        return super().clean(data, initial)
+
+
+class ServicePhotoCaptionForm(BootstrapFormMixin, forms.ModelForm):
+    """Редактирование подписи к фотографии услуги."""
+
+    class Meta:
+        model = ServicePhoto
+        fields = ["caption"]
+        labels = {"caption": "Подпись к фото"}
+        widgets = {
+            "caption": forms.TextInput(
+                attrs={
+                    "placeholder": "Например, «До / после»",
+                    "maxlength": "120",
+                }
+            )
+        }
+
+    def clean_caption(self):
+        return (self.cleaned_data.get("caption") or "").strip()
+
+
+class ServicePhotoUploadForm(BootstrapFormMixin, forms.Form):
+    """Загрузка нескольких фотографий к услуге."""
+
+    images = MultipleFileField(
+        label="Фотографии",
+        widget=MultipleFileInput(
+            attrs={
+                "multiple": True,
+                "accept": "image/jpeg,image/png,image/webp",
+            }
+        ),
+        help_text="JPG, PNG или WebP, до 10 МБ каждая.",
+    )
+    caption = forms.CharField(
+        label="Подпись для новых фото",
+        max_length=120,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "Например, «До / после»",
+                "maxlength": "120",
+            }
+        ),
+    )
+
+    def clean_caption(self):
+        return (self.cleaned_data.get("caption") or "").strip()
 
 
 class OrderForm(BootstrapFormMixin, forms.ModelForm):

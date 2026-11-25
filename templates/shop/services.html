@@ -67,8 +67,25 @@
           <tr data-service-row="{{ service.pk }}">
             <td data-label="Услуга">
               <span class="service-name">{{ service.name }}</span>
+              <span class="service-photo-meta">Фото: {{ service.photos.all|length }} из {{ photo_limit }}</span>
+              {% if service.photos.all %}
+                <span class="service-photo-strip" aria-hidden="true">
+                  {% for photo in service.photos.all|slice:":3" %}
+                    <img class="service-photo-thumb" src="{{ photo.image.url }}"
+                         alt="" loading="lazy" width="28" height="28">
+                  {% endfor %}
+                </span>
+              {% endif %}
             </td>
-            <td data-label="Цена" class="text-end tabular fw-semibold">{{ service.price|rub }}</td>
+            <td data-label="Цена" class="text-end">
+              <div class="price-cell">
+                <span class="price-current tabular fw-semibold">{{ service.price|rub }}</span>
+                {% if service.has_discount %}
+                  <span class="price-old tabular">{{ service.old_price|rub }}</span>
+                  <span class="discount-pill">-{{ service.discount_percent }}%</span>
+                {% endif %}
+              </div>
+            </td>
             <td data-label="Себестоимость" class="text-end tabular">{{ service.cost_price|rub }}</td>
             <td data-label="Маржа" class="text-end tabular {% if service.margin < 0 %}is-negative{% endif %}">
               {{ service.margin|rub }}<span class="margin-note">{{ service.margin_percent }}%</span>
@@ -83,12 +100,18 @@
             </td>
             <td data-label="Действия" class="text-end">
               <div class="row-actions">
+                <a class="btn btn-icon btn-sm" title="Фотографии услуги"
+                   aria-label="Фотографии услуги {{ service.name }}"
+                   href="{% url 'shop:services' %}?photos={{ service.pk }}#photos">
+                  {% svg_icon "camera" 15 %}
+                </a>
                 <button type="button" class="btn btn-icon btn-sm" title="Изменить услугу"
                         aria-label="Изменить услугу {{ service.name }}"
                         data-bs-toggle="modal" data-bs-target="#serviceModal"
                         data-service-id="{{ service.pk }}"
                         data-service-name="{{ service.name }}"
                         data-service-price="{{ service.price }}"
+                        data-service-old-price="{{ service.old_price|default_if_none:'' }}"
                         data-service-cost="{{ service.cost_price }}"
                         data-service-duration="{{ service.duration_minutes }}"
                         data-service-active="{% if service.is_active %}1{% else %}0{% endif %}">
@@ -156,17 +179,25 @@
               <span class="invalid-feedback d-block" data-field-error="price"></span>
             </div>
             <div class="mb-3">
+              <label class="form-label" for="{{ service_form.old_price.id_for_label }}">Старая цена, ₽</label>
+              {{ service_form.old_price }}
+              <span class="invalid-feedback d-block" data-field-error="old_price"></span>
+              <div class="form-text">Выше текущей цены — покажем зачёркнутую цену и скидку.</div>
+            </div>
+          </div>
+
+          <div class="form-grid form-grid--2">
+            <div class="mb-3">
               <label class="form-label" for="{{ service_form.cost_price.id_for_label }}">Себестоимость, ₽</label>
               {{ service_form.cost_price }}
               <span class="invalid-feedback d-block" data-field-error="cost_price"></span>
               <div class="form-text">Расходники: масло, краска, фурнитура.</div>
             </div>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label" for="{{ service_form.duration_minutes.id_for_label }}">Длительность, мин</label>
-            {{ service_form.duration_minutes }}
-            <span class="invalid-feedback d-block" data-field-error="duration_minutes"></span>
+            <div class="mb-3">
+              <label class="form-label" for="{{ service_form.duration_minutes.id_for_label }}">Длительность, мин</label>
+              {{ service_form.duration_minutes }}
+              <span class="invalid-feedback d-block" data-field-error="duration_minutes"></span>
+            </div>
           </div>
 
           <label class="form-check form-check-card" for="{{ service_form.is_active.id_for_label }}">
@@ -211,5 +242,112 @@
     </div>
   </div>
 </div>
+
+{# ------------------------------ Фотографии услуги ------------------------------ #}
+{% if photo_service %}
+<div class="modal fade" id="servicePhotosModal" tabindex="-1"
+     aria-labelledby="service-photos-title" aria-hidden="true" data-open="1">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title h5" id="service-photos-title">Фотографии услуги</h2>
+          <p class="modal-subtitle">
+            {{ photo_service.name }} · Фото: {{ photos|length }} из {{ photo_limit }}
+          </p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        {% if photos %}
+          <div class="photo-grid">
+            {% for photo in photos %}
+              <article class="photo-card" data-photo-card="{{ photo.pk }}">
+                <div class="photo-card__preview">
+                  <img src="{{ photo.image.url }}"
+                       alt="{{ photo.caption|default:photo_service.name }}"
+                       loading="lazy">
+                </div>
+                <form method="post" action="{% url 'shop:service_photo_caption' photo.pk %}"
+                      class="photo-caption-form" data-ajax-form="photo-caption">
+                  {% csrf_token %}
+                  <label class="visually-hidden" for="{{ photo.caption_form.caption.id_for_label }}">Подпись к фото</label>
+                  {{ photo.caption_form.caption }}
+                  <span class="invalid-feedback d-block" data-field-error="caption"></span>
+                  <button class="btn btn-outline-secondary btn-sm" type="submit">
+                    {% svg_icon "check" 14 %} Сохранить подпись
+                  </button>
+                </form>
+                <form method="post" action="{% url 'shop:service_photo_delete' photo.pk %}"
+                      class="photo-delete-form" data-ajax-form="photo-delete">
+                  {% csrf_token %}
+                  <button class="btn btn-outline-danger btn-sm js-photo-delete" type="submit"
+                          title="Удалить фотографию">
+                    {% svg_icon "trash" 14 %}
+                    <span class="photo-delete-label">Удалить</span>
+                  </button>
+                </form>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state empty-state--compact">
+            {% svg_icon "image" 26 %}
+            <h2>Фотографий пока нет</h2>
+            <p>Загрузите примеры работ — клиенты увидят их на публичной странице услуги.</p>
+          </div>
+        {% endif %}
+
+        {% if photo_remaining > 0 %}
+          <form method="post" enctype="multipart/form-data"
+                action="{% url 'shop:service_photo_upload' photo_service.pk %}"
+                class="photo-upload-form" data-ajax-form="photo-upload" novalidate>
+            {% csrf_token %}
+            <div class="photo-upload-form__head">
+              <div>
+                <h3>Добавить фотографии</h3>
+                <p class="text-muted small mb-0">Можно выбрать сразу несколько файлов.</p>
+              </div>
+              <span class="photo-limit-note">Осталось: {{ photo_remaining }} из {{ photo_limit }}</span>
+            </div>
+
+            <div class="form-grid form-grid--2">
+              <div class="mb-3">
+                <label class="form-label" for="{{ photo_upload_form.images.id_for_label }}">Фотографии</label>
+                {{ photo_upload_form.images }}
+                <span class="invalid-feedback d-block" data-field-error="images"></span>
+                <div class="form-text">
+                  JPG, PNG или WebP, до 10 МБ. Автоматически уменьшаем до 1200 px и переводим в WebP.
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="{{ photo_upload_form.caption.id_for_label }}">Подпись для новых фото</label>
+                {{ photo_upload_form.caption }}
+                <span class="invalid-feedback d-block" data-field-error="caption"></span>
+                <div class="form-text">Добавить или изменить подпись можно и позже.</div>
+              </div>
+            </div>
+
+            <div class="form-error" data-form-error aria-live="polite"></div>
+            <div class="photo-upload-form__actions">
+              <span class="text-muted small">Максимум {{ photo_limit }} фото на услугу.</span>
+              <button class="btn btn-primary" type="submit">
+                {% svg_icon "upload" 16 %} Загрузить фото
+              </button>
+            </div>
+          </form>
+        {% else %}
+          <div class="alert alert-info mb-0" role="status">
+            Достигнут лимит: {{ photo_limit }} фото. Удалите лишние, чтобы загрузить новые.
+          </div>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
